@@ -42,6 +42,20 @@ cp .env.example .env
 docker-compose up -d
 ```
 
+## Port Configuration and Security
+
+### Exposed Ports (External Access)
+- 80: Mempool.space web interface
+- 8333: Bitcoin Core P2P (required for Bitcoin network)
+
+### Protected Ports (Internal Only)
+- 8332: Bitcoin Core RPC
+- 50001: Fulcrum Electrum protocol
+- 50002: Fulcrum SSL
+- 3306: MariaDB
+
+All internal services are protected and only accessible within the Docker network. For detailed security information, see [Security Documentation](.project/SECURITY.md).
+
 ## Environment Configuration
 
 The `.env` file contains all the necessary configuration for the services. Here's what each section controls:
@@ -70,33 +84,37 @@ The `.env` file contains all the necessary configuration for the services. Here'
 
 ### Bitcoin Core
 - Ports:
-  - 8332: RPC
-  - 8333: P2P
+  - 8332: RPC (internal only)
+  - 8333: P2P (external)
 - Data directory: `./data/bitcoin`
 - Config directory: `./config/bitcoin`
 - Health check: Monitors blockchain status
+- Security: RPC access restricted to Docker network
 
 ### Fulcrum (Electrum Server)
 - Ports:
-  - 50001: Electrum protocol
-  - 50002: SSL
+  - 50001: Electrum protocol (internal only)
+  - 50002: SSL (internal only)
 - Data directory: `./data/fulcrum`
 - Config directory: `./config/fulcrum`
 - SSL certificates: Automatically generated during setup
 - Health check: Monitors service availability
+- Security: SSL/TLS enabled, internal access only
 
 ### MariaDB
-- Port: 3306 (internal)
+- Port: 3306 (internal only)
 - Data directory: `./data/mariadb`
 - Config directory: `./config/mariadb`
 - Database: mempool
 - Health check: Monitors database connectivity
+- Security: Internal access only, authentication required
 
 ### Mempool.space
-- Port: 80
+- Port: 80 (external)
 - Data directory: `./data/mempool`
 - Config directory: `./config/mempool`
 - Health check: Monitors API availability
+- Security: Public web interface, protected backend
 
 ## Initial Sync
 
@@ -115,6 +133,7 @@ docker-compose logs -f bitcoin
 5. SSL certificates for Fulcrum are automatically generated during setup
 6. MariaDB credentials should be changed from defaults in production
 7. Keep your `.env` file secure and never commit it to version control
+8. Review and follow the [Security Documentation](.project/SECURITY.md) for best practices
 
 ## Maintenance
 
@@ -182,6 +201,8 @@ docker-compose ps
 │   ├── fulcrum/
 │   ├── mempool/
 │   └── mariadb/
+├── .project/
+│   └── SECURITY.md
 ├── docker-compose.yml
 ├── setup.sh
 ├── .env.example
