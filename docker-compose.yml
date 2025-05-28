@@ -1,0 +1,103 @@
+version: '3.8'
+
+services:
+  bitcoin:
+    image: ruimarinho/bitcoin-core:latest
+    container_name: bitcoin-core
+    volumes:
+      - ./data/bitcoin:/home/bitcoin/.bitcoin
+      - ./config/bitcoin:/home/bitcoin/.bitcoin
+    ports:
+      - "8332:8332"  # RPC
+      - "8333:8333"  # P2P
+    command: 
+      -printtoconsole
+      -server=1
+      -rpcallowip=0.0.0.0/0
+      -rpcbind=0.0.0.0
+      -rpcuser=${BITCOIN_RPC_USER}
+      -rpcpassword=${BITCOIN_RPC_PASSWORD}
+    networks:
+      - bitcoin_network
+    healthcheck:
+      test: ["CMD", "bitcoin-cli", "getblockchaininfo"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  fulcrum:
+    image: cculianu/fulcrum:latest
+    container_name: fulcrum
+    volumes:
+      - ./data/fulcrum:/data
+      - ./config/fulcrum:/config
+    ports:
+      - "50001:50001"  # Electrum protocol
+      - "50002:50002"  # SSL
+    environment:
+      - BITCOIN_RPC_USER=${BITCOIN_RPC_USER}
+      - BITCOIN_RPC_PASSWORD=${BITCOIN_RPC_PASSWORD}
+    depends_on:
+      bitcoin:
+        condition: service_healthy
+    networks:
+      - bitcoin_network
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "50001"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  mariadb:
+    image: mariadb:10.6
+    container_name: mariadb
+    volumes:
+      - ./data/mariadb:/var/lib/mysql
+      - ./config/mariadb/init:/docker-entrypoint-initdb.d
+      - ./config/mariadb/my.cnf:/etc/mysql/conf.d/my.cnf
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+    networks:
+      - bitcoin_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  mempool:
+    image: mempool/mempool:latest
+    container_name: mempool
+    volumes:
+      - ./data/mempool:/data
+      - ./config/mempool:/config
+    ports:
+      - "80:80"
+    environment:
+      - BITCOIN_RPC_USER=${BITCOIN_RPC_USER}
+      - BITCOIN_RPC_PASSWORD=${BITCOIN_RPC_PASSWORD}
+    depends_on:
+      bitcoin:
+        condition: service_healthy
+      fulcrum:
+        condition: service_healthy
+      mariadb:
+        condition: service_healthy
+    networks:
+      - bitcoin_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/api/v1/fees/recommended"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+networks:
+  bitcoin_network:
+    driver: bridge 
