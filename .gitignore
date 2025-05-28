@@ -1,0 +1,67 @@
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Data directories
+data/
+**/data/
+
+# Logs
+*.log
+logs/
+**/logs/
+
+# SSL certificates
+*.key
+*.pem
+*.cert
+*.crt
+*.csr
+*.srl
+
+# Docker
+.docker/
+docker-compose.override.yml
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Build and cache directories
+dist/
+build/
+.cache/
+.temp/
+tmp/
+
+# Database files
+*.sqlite
+*.sqlite3
+*.db
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# System Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
