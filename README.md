@@ -6,6 +6,8 @@ This repository contains a Docker Compose setup for running a complete mempool.s
 - MariaDB
 - Mempool.space frontend and backend
 
+All services are built on Ubuntu 24.04 LTS for consistency and long-term support.
+
 ## Prerequisites
 
 - Docker
@@ -37,10 +39,26 @@ cp .env.example .env
 ./setup.sh
 ```
 
-5. Start the services:
+5. Build and start the services:
 ```bash
-docker-compose up -d
+./build.sh
 ```
+
+## Base System Information
+
+All containers are built on Ubuntu 24.04 LTS, providing:
+- Consistent package management (apt)
+- Latest security updates and patches
+- Modern system libraries and tools
+- Better compatibility with newer software versions
+- Long-term support until 2029
+
+### Service Versions
+- Bitcoin Core: 25.0
+- Fulcrum: 1.9.0
+- MariaDB: 10.6
+- Mempool: 2.3.0
+- Node.js: 20.x
 
 ## Port Configuration and Security
 
@@ -56,33 +74,36 @@ docker-compose up -d
 
 All internal services are protected and only accessible within the Docker network. For detailed security information, see [Security Documentation](.project/SECURITY.md).
 
-## Environment Configuration
+## Building from Source
 
-The `.env` file contains all the necessary configuration for the services. Here's what each section controls:
+The project uses custom Dockerfiles to build each service from source on Ubuntu 24.04. This ensures:
+- Consistent base system across all services
+- Latest security patches
+- Optimized builds for your system
+- Full control over the build process
 
-### Bitcoin Core Configuration
-- `BITCOIN_RPC_USER`: Username for Bitcoin Core RPC access
-- `BITCOIN_RPC_PASSWORD`: Password for Bitcoin Core RPC access
+### Build Process
+1. The `build.sh` script handles the entire build process:
+   - Checks prerequisites
+   - Cleans up old images
+   - Builds new images
+   - Verifies the build
+   - Tests service health
 
-### Mempool Configuration
-- `MEMPOOL_BACKEND`: Backend type (electrum)
-- `MEMPOOL_ELECTRUM_HOST`: Hostname of the Electrum server
-- `MEMPOOL_ELECTRUM_PORT`: Port of the Electrum server
-- `MEMPOOL_ELECTRUM_TLS_ENABLED`: Whether to use TLS for Electrum connection
+2. To rebuild a specific service:
+```bash
+docker-compose build <service-name>
+```
 
-### Fulcrum Configuration
-- `FULCRUM_BITCOIN_RPC_HOST`: Hostname of the Bitcoin Core RPC server
-- `FULCRUM_BITCOIN_RPC_PORT`: Port of the Bitcoin Core RPC server
-
-### MariaDB Configuration
-- `MYSQL_ROOT_PASSWORD`: Root password for MariaDB
-- `MYSQL_DATABASE`: Database name for mempool.space
-- `MYSQL_USER`: Username for mempool.space database access
-- `MYSQL_PASSWORD`: Password for mempool.space database access
+3. To rebuild all services:
+```bash
+./build.sh
+```
 
 ## Service Details
 
 ### Bitcoin Core
+- Base: Ubuntu 24.04 LTS
 - Ports:
   - 8332: RPC (internal only)
   - 8333: P2P (external)
@@ -92,6 +113,7 @@ The `.env` file contains all the necessary configuration for the services. Here'
 - Security: RPC access restricted to Docker network
 
 ### Fulcrum (Electrum Server)
+- Base: Ubuntu 24.04 LTS
 - Ports:
   - 50001: Electrum protocol (internal only)
   - 50002: SSL (internal only)
@@ -102,6 +124,7 @@ The `.env` file contains all the necessary configuration for the services. Here'
 - Security: SSL/TLS enabled, internal access only
 
 ### MariaDB
+- Base: Ubuntu 24.04 LTS
 - Port: 3306 (internal only)
 - Data directory: `./data/mariadb`
 - Config directory: `./config/mariadb`
@@ -110,6 +133,7 @@ The `.env` file contains all the necessary configuration for the services. Here'
 - Security: Internal access only, authentication required
 
 ### Mempool.space
+- Base: Ubuntu 24.04 LTS
 - Port: 80 (external)
 - Data directory: `./data/mempool`
 - Config directory: `./config/mempool`
@@ -139,8 +163,12 @@ docker-compose logs -f bitcoin
 
 ### Updating
 ```bash
-docker-compose pull
-docker-compose up -d
+# Update all services
+./build.sh
+
+# Update specific service
+docker-compose build <service-name>
+docker-compose up -d <service-name>
 ```
 
 ### Backup
@@ -202,9 +230,15 @@ docker-compose ps
 │   ├── mempool/
 │   └── mariadb/
 ├── .project/
+│   ├── COMMANDS.md
 │   └── SECURITY.md
+├── Dockerfile.bitcoin
+├── Dockerfile.fulcrum
+├── Dockerfile.mariadb
+├── Dockerfile.mempool
 ├── docker-compose.yml
 ├── setup.sh
+├── build.sh
 ├── .env.example
 └── README.md
 ```

@@ -1,5 +1,100 @@
 # Docker Commands and Troubleshooting Guide
 
+## Container Base OS Information
+
+All containers are now based on Ubuntu 24.04 LTS, providing a consistent and modern base operating system across all services.
+
+### Common Ubuntu Commands
+```bash
+# Update package lists
+docker-compose exec <service> apt update
+
+# Install additional packages
+docker-compose exec <service> apt install <package-name>
+
+# Check OS version
+docker-compose exec <service> cat /etc/os-release
+
+# Check Ubuntu version
+docker-compose exec <service> lsb_release -a
+```
+
+### Service-Specific Information
+
+#### Bitcoin Core
+- Base OS: Ubuntu 24.04 LTS
+- Package Manager: apt
+- Bitcoin Core Version: 25.0
+- Common commands:
+  ```bash
+  # Update Bitcoin Core
+  docker-compose exec bitcoin apt update && docker-compose exec bitcoin apt install bitcoind
+
+  # Check Bitcoin Core version
+  docker-compose exec bitcoin bitcoind --version
+  ```
+
+#### Fulcrum
+- Base OS: Ubuntu 24.04 LTS
+- Package Manager: apt
+- Fulcrum Version: 1.9.0
+- Common commands:
+  ```bash
+  # Update Fulcrum
+  docker-compose exec fulcrum apt update && docker-compose exec fulcrum apt install fulcrum
+
+  # Check Fulcrum version
+  docker-compose exec fulcrum Fulcrum --version
+  ```
+
+#### MariaDB
+- Base OS: Ubuntu 24.04 LTS
+- Package Manager: apt
+- MariaDB Version: 10.6
+- Common commands:
+  ```bash
+  # Update MariaDB
+  docker-compose exec mariadb apt update && docker-compose exec mariadb apt install mariadb-server
+
+  # Check MariaDB version
+  docker-compose exec mariadb mysql --version
+  ```
+
+#### Mempool
+- Base OS: Ubuntu 24.04 LTS
+- Package Manager: apt
+- Node.js Version: 20.x
+- Common commands:
+  ```bash
+  # Update Node.js
+  docker-compose exec mempool apt update && docker-compose exec mempool apt install nodejs
+
+  # Check Node.js version
+  docker-compose exec mempool node --version
+  ```
+
+### Building Custom Images
+```bash
+# Build all images
+docker-compose build
+
+# Build specific service
+docker-compose build bitcoin
+
+# Build and start services
+docker-compose up -d --build
+
+# Force rebuild without cache
+docker-compose build --no-cache
+```
+
+Note: The move to Ubuntu 24.04 LTS provides:
+- Consistent package management across all services
+- Latest security updates and patches
+- Modern system libraries and tools
+- Better compatibility with newer software versions
+- Long-term support until 2029
+
 ## Basic Container Management
 
 ### Starting Services
@@ -383,4 +478,350 @@ Remember to:
 - Monitor services after updates
 - Check logs for any issues after updates
 
-Remember to replace any passwords or sensitive information with your actual values when using these commands. 
+Remember to replace any passwords or sensitive information with your actual values when using these commands.
+
+# Common Docker Commands
+
+## Prerequisites
+
+### Check Docker Installation
+```bash
+docker --version
+docker-compose --version
+```
+
+### Check System Requirements
+```bash
+# Check available disk space
+df -h
+
+# Check available memory
+free -h
+
+# Check CPU information
+lscpu
+```
+
+## Initial Setup
+
+### Clone Repository
+```bash
+git clone <repository-url>
+cd mempool.space-docker-full-stack
+```
+
+### Environment Setup
+```bash
+# Copy environment file
+cp .env.example .env
+
+# Edit environment file
+nano .env
+```
+
+### Run Setup Script
+```bash
+# Make script executable
+chmod +x setup.sh
+
+# Run setup
+./setup.sh
+```
+
+## Building and Starting Services
+
+### Build Process
+```bash
+# Make build script executable
+chmod +x build.sh
+
+# Build all services
+./build.sh
+
+# Build specific service
+docker-compose build <service-name>
+
+# View build logs
+docker-compose logs --tail=50
+```
+
+### Starting Services
+```bash
+# Start all services
+docker-compose up -d
+
+# Start specific service
+docker-compose up -d <service-name>
+
+# View service status
+docker-compose ps
+```
+
+## Monitoring and Logs
+
+### Service Status
+```bash
+# Check all services
+docker-compose ps
+
+# Check specific service
+docker-compose ps <service-name>
+
+# Check service health
+docker-compose ps --format "table {{.Name}}\t{{.Status}}\t{{.Health}}"
+```
+
+### Viewing Logs
+```bash
+# All services
+docker-compose logs -f
+
+# Specific service
+docker-compose logs -f <service-name>
+
+# Last 100 lines
+docker-compose logs --tail=100 -f
+
+# Since last 5 minutes
+docker-compose logs --since 5m -f
+```
+
+## Maintenance
+
+### Updating Services
+```bash
+# Update all services
+./build.sh
+
+# Update specific service
+docker-compose build <service-name>
+docker-compose up -d <service-name>
+```
+
+### Backup
+```bash
+# Backup data directories
+tar -czf backup-$(date +%Y%m%d).tar.gz data/
+
+# Backup specific service
+tar -czf bitcoin-backup-$(date +%Y%m%d).tar.gz data/bitcoin/
+```
+
+### Cleanup
+```bash
+# Remove unused containers
+docker container prune
+
+# Remove unused images
+docker image prune
+
+# Remove unused volumes
+docker volume prune
+
+# Remove all unused objects
+docker system prune
+```
+
+## Troubleshooting
+
+### Service Issues
+```bash
+# Check service logs
+docker-compose logs <service-name>
+
+# Restart service
+docker-compose restart <service-name>
+
+# Rebuild and restart service
+docker-compose up -d --build <service-name>
+```
+
+### Network Issues
+```bash
+# Check network configuration
+docker network ls
+docker network inspect bitcoin_network
+
+# Check container IPs
+docker-compose exec <service-name> ip addr
+```
+
+### Permission Issues
+```bash
+# Fix data directory permissions
+sudo chown -R 1000:1000 data/bitcoin
+sudo chown -R 1000:1000 data/fulcrum
+sudo chown -R 1000:1000 data/mempool
+sudo chown -R 999:999 data/mariadb
+```
+
+## Ubuntu-Specific Commands
+
+### System Updates
+```bash
+# Update package lists
+sudo apt update
+
+# Upgrade packages
+sudo apt upgrade
+
+# Clean up
+sudo apt clean
+sudo apt autoremove
+```
+
+### Docker Management
+```bash
+# Check Docker service status
+sudo systemctl status docker
+
+# Restart Docker service
+sudo systemctl restart docker
+
+# View Docker logs
+sudo journalctl -fu docker
+```
+
+### Resource Monitoring
+```bash
+# Monitor system resources
+htop
+
+# Monitor disk I/O
+iostat -x 1
+
+# Monitor network
+iftop
+```
+
+## Common Issues and Solutions
+
+### 1. Service Won't Start
+```bash
+# Check logs
+docker-compose logs <service-name>
+
+# Check disk space
+df -h
+
+# Check memory
+free -h
+```
+
+### 2. Connection Issues
+```bash
+# Check network
+docker network inspect bitcoin_network
+
+# Test connectivity
+docker-compose exec <service-name> ping <target-service>
+```
+
+### 3. Permission Denied
+```bash
+# Fix permissions
+sudo chown -R $(id -u):$(id -g) data/
+```
+
+### 4. Build Failures
+```bash
+# Clean build
+docker-compose build --no-cache <service-name>
+
+# Check build logs
+docker-compose build <service-name> --progress=plain
+```
+
+### 5. Container Health Issues
+```bash
+# Check health status
+docker-compose ps
+
+# View health check logs
+docker inspect --format='{{json .State.Health}}' <container-id> | jq
+```
+
+## Security Commands
+
+### SSL Certificate Management
+```bash
+# Check certificate validity
+openssl x509 -in config/fulcrum/fulcrum.cert -text -noout
+
+# Generate new certificates
+./setup.sh --regenerate-certs
+```
+
+### Access Control
+```bash
+# Check RPC access
+curl --user <rpc-user>:<rpc-password> --data-binary '{"jsonrpc": "1.0", "id": "curltest", "method": "getblockchaininfo", "params": []}' -H 'content-type: text/plain;' http://localhost:8332/
+
+# Test MariaDB connection
+docker-compose exec mariadb mysql -u root -p
+```
+
+## Maintenance Tasks
+
+### Regular Updates
+```bash
+# Update all services
+./build.sh
+
+# Update specific service
+docker-compose build <service-name>
+docker-compose up -d <service-name>
+```
+
+### Backup Schedule
+```bash
+# Daily backup
+0 0 * * * tar -czf /backup/backup-$(date +\%Y\%m\%d).tar.gz /path/to/data/
+
+# Weekly backup
+0 0 * * 0 tar -czf /backup/weekly-backup-$(date +\%Y\%m\%d).tar.gz /path/to/data/
+```
+
+### Log Rotation
+```bash
+# Configure log rotation
+sudo nano /etc/logrotate.d/docker
+
+# Manual log rotation
+docker-compose logs --tail=1000 > logs-$(date +%Y%m%d).log
+```
+
+## Performance Tuning
+
+### Resource Limits
+```bash
+# Check container resource usage
+docker stats
+
+# Set resource limits in docker-compose.yml
+services:
+  bitcoin:
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+```
+
+### Network Optimization
+```bash
+# Check network performance
+docker-compose exec bitcoin ping fulcrum
+
+# Monitor network traffic
+docker-compose exec bitcoin iftop
+```
+
+### Disk I/O Optimization
+```bash
+# Check disk I/O
+docker-compose exec bitcoin iostat -x 1
+
+# Monitor disk usage
+docker-compose exec bitcoin df -h
+``` 

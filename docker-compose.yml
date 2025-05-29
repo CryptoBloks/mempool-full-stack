@@ -2,7 +2,9 @@ version: '3.8'
 
 services:
   bitcoin:
-    image: ruimarinho/bitcoin-core:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.bitcoin
     container_name: bitcoin-core
     volumes:
       - ./data/bitcoin:/home/bitcoin/.bitcoin
@@ -36,7 +38,9 @@ services:
       - NET_BIND_SERVICE
 
   fulcrum:
-    image: cculianu/fulcrum:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.fulcrum
     container_name: fulcrum
     volumes:
       - ./data/fulcrum:/data
@@ -72,7 +76,9 @@ services:
       - NET_BIND_SERVICE
 
   mariadb:
-    image: mariadb:10.6
+    build:
+      context: .
+      dockerfile: Dockerfile.mariadb
     container_name: mariadb
     volumes:
       - ./data/mariadb:/var/lib/mysql
@@ -102,7 +108,9 @@ services:
       - NET_BIND_SERVICE
 
   mempool:
-    image: mempool/mempool:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.mempool
     container_name: mempool
     volumes:
       - ./data/mempool:/data

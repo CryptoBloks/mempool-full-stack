@@ -1,156 +1,171 @@
 # Security Documentation
 
+## Base System Security
+
+All services are built on Ubuntu 24.04 LTS, providing:
+- Regular security updates and patches
+- Modern security features and hardening
+- Long-term support until 2029
+- Consistent security baseline across all services
+
+### Ubuntu 24.04 Security Features
+- AppArmor for container isolation
+- Secure boot support
+- Regular security updates
+- Modern cryptography libraries
+- System-wide security policies
+
 ## Network Architecture
 
 ### Network Configuration
 - Custom bridge network: `bitcoin_network`
-- Subnet: 172.16.0.0/16
+- Subnet: `172.16.0.0/16`
 - Static IP assignments:
-  - Bitcoin Core: 172.16.0.2
-  - Fulcrum: 172.16.0.3
-  - MariaDB: 172.16.0.4
-  - Mempool: 172.16.0.5
+  - Bitcoin Core: `172.16.0.2`
+  - Fulcrum: `172.16.0.3`
+  - MariaDB: `172.16.0.4`
+  - Mempool: `172.16.0.5`
 
 ### Port Configuration
 
-#### Bitcoin Core
-- Exposed Ports:
-  - 8333: P2P (external) - Required for Bitcoin network communication
-- Protected Ports:
-  - 8332: RPC (internal only) - Only accessible within Docker network
-- RPC Access:
-  - Restricted to Docker network (172.16.0.0/12)
-  - Requires authentication
+#### Exposed Ports (External Access)
+- 80: Mempool.space web interface
+- 8333: Bitcoin Core P2P (required for Bitcoin network)
 
-#### Fulcrum (Electrum Server)
-- Protected Ports:
-  - 50001: Electrum protocol (internal only)
-  - 50002: SSL (internal only)
-- Access:
-  - Only accessible from within Docker network
-  - SSL/TLS enabled for secure communication
-
-#### MariaDB
-- Protected Ports:
-  - 3306: Database (internal only)
-- Access:
-  - Only accessible from within Docker network
-  - Requires authentication
-  - No external access
-
-#### Mempool.space
-- Exposed Ports:
-  - 80: Web interface (external)
-- Protected Ports:
-  - All internal communication ports
-- Access:
-  - Web interface publicly accessible
-  - Backend services only accessible within Docker network
+#### Protected Ports (Internal Only)
+- 8332: Bitcoin Core RPC
+- 50001: Fulcrum Electrum protocol
+- 50002: Fulcrum SSL
+- 3306: MariaDB
 
 ## Container Security
 
 ### Common Security Measures
-All containers implement:
-- `no-new-privileges`: Prevents privilege escalation
-- Dropped capabilities: All capabilities removed except `NET_BIND_SERVICE`
-- Health checks: Ensures service availability and proper startup order
-- Restart policy: `unless-stopped` for automatic recovery
+- `no-new-privileges: true` to prevent privilege escalation
+- Dropped capabilities except `NET_BIND_SERVICE`
+- Health checks for service monitoring
+- Restart policy: `on-failure:3`
+- Resource limits to prevent DoS
 
 ### Service-Specific Security
 
 #### Bitcoin Core
 - RPC authentication required
-- Network access restricted to Docker network
-- Minimal port exposure
+- RPC access restricted to Docker network
+- P2P port (8333) exposed for Bitcoin network
+- Data directory mounted with proper permissions
 
 #### Fulcrum
 - SSL/TLS encryption for all connections
-- Internal network access only
-- Authentication required for Bitcoin Core connection
+- Self-signed certificates for internal communication
+- Electrum protocol ports (50001, 50002) internal only
+- Data directory mounted with proper permissions
 
 #### MariaDB
-- Internal network access only
 - Strong password authentication
-- Optimized security settings in my.cnf
+- Database access restricted to Docker network
+- Data directory mounted with proper permissions
+- Initialization script for secure database setup
 
-#### Mempool.space
-- Public web interface only
-- Backend services protected
-- Authentication required for Bitcoin Core and database access
+#### Mempool
+- Web interface (port 80) exposed
+- Backend API internal only
+- Data directory mounted with proper permissions
+- Environment variables for configuration
+
+## Build Process Security
+
+### Dockerfile Security
+- Multi-stage builds to minimize image size
+- No sensitive data in images
+- Minimal base image (Ubuntu 24.04)
+- Regular security updates
+- Proper user permissions
+
+### Build Script Security
+- Prerequisite checks
+- Clean build environment
+- Verification of built images
+- Health check validation
+- Log monitoring
 
 ## Data Security
 
 ### Volume Mounts
-- All data directories mounted as volumes
-- Proper permissions set (755 for directories)
-- Sensitive data isolated in Docker volumes
+- Persistent data directories
+- Proper permissions (1000:1000 for services, 999:999 for MariaDB)
+- No sensitive data in volumes
+- Regular backups recommended
 
-### SSL/TLS
-- Fulcrum SSL certificates automatically generated
-- Certificates stored in config directory
-- Proper permissions (600 for keys, 644 for certificates)
+### SSL/TLS Certificates
+- Self-signed certificates for internal communication
+- Certificate generation during setup
+- Certificate rotation support
+- Proper permissions on certificate files
 
 ## Access Control
 
 ### Authentication
-- Bitcoin Core: RPC authentication required
-- MariaDB: Root and user authentication required
-- Fulcrum: Bitcoin Core authentication required
-- Mempool: Service authentication required
+- Bitcoin Core RPC: Username/password
+- MariaDB: Username/password
+- Fulcrum: SSL/TLS certificates
+- Mempool: Environment variables
 
 ### Network Access
-- Inter-container communication enabled
-- External access limited to necessary ports
-- All internal services protected
+- Internal services: Docker network only
+- External services: Specific ports only
+- No direct access to internal services
+- Proper firewall rules recommended
 
 ## Monitoring and Maintenance
 
 ### Health Checks
-- Bitcoin Core: Blockchain status monitoring
-- Fulcrum: Service availability check
-- MariaDB: Database connectivity check
-- Mempool: API availability check
+- Bitcoin Core: Blockchain status
+- Fulcrum: Service availability
+- MariaDB: Database connectivity
+- Mempool: API availability
 
 ### Logging
-- All services configured for proper logging
-- Log rotation enabled
-- Error tracking implemented
+- Container logs for all services
+- Health check results
+- Error monitoring
+- Regular log rotation
 
 ## Security Best Practices
 
-1. Regular Updates
-   - Keep all containers updated
-   - Monitor for security patches
-   - Update SSL certificates before expiration
+### Regular Maintenance
+1. Update base images regularly
+2. Rotate SSL certificates
+3. Monitor security advisories
+4. Regular backups
+5. Log monitoring
 
-2. Backup Strategy
-   - Regular backups of data directories
-   - Secure storage of backup data
-   - Test restoration procedures
-
-3. Monitoring
-   - Regular security audits
-   - Monitor for unauthorized access
-   - Track system resource usage
-
-4. Incident Response
-   - Document security procedures
-   - Maintain access logs
-   - Regular security reviews
+### Additional Security Measures
+1. Use reverse proxy with SSL
+2. Implement rate limiting
+3. Regular security audits
+4. Monitor system resources
+5. Keep documentation updated
 
 ## Recommendations
 
-1. Additional Security Measures
-   - Consider implementing a reverse proxy with SSL
-   - Add rate limiting for public endpoints
-   - Implement IP whitelisting for sensitive services
+### Additional Security Measures
+1. Implement fail2ban for SSH access
+2. Set up monitoring alerts
+3. Regular security scans
+4. Backup encryption
+5. Network segmentation
 
-2. Monitoring
-   - Set up external monitoring
-   - Implement alerting for security events
-   - Regular security scanning
+### Monitoring
+1. Set up Prometheus metrics
+2. Configure Grafana dashboards
+3. Implement alerting
+4. Regular log analysis
+5. Resource monitoring
 
-3. Maintenance
-   - Regular security updates
-   - Certificate rotation
-   - Access review and audit 
+### Maintenance
+1. Regular updates
+2. Security patches
+3. Certificate rotation
+4. Backup verification
+5. Performance monitoring 
