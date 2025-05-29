@@ -1,0 +1,6 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+- all docker containers should be based on Ubuntu 24.04 LTS.  You may use Ubuntu 22.04 LTS if 24.04 is not supported by a specific application.

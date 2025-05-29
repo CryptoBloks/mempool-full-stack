@@ -1,0 +1,37 @@
+FROM ubuntu:24.04
+
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    wget \
+    gnupg2 \
+    software-properties-common \
+    && rm -rf /var/lib/apt/lists/*
+
+# Add MariaDB repository
+RUN wget -qO- https://mariadb.org/mariadb_release_signing_key.asc | gpg --dearmor > /usr/share/keyrings/mariadb-archive-keyring.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/mariadb-archive-keyring.gpg] https://dlm.mariadb.com/repo/mariadb-server/10.6/repo/ubuntu $(lsb_release -cs) main" > /etc/apt/sources.list.d/mariadb.list
+
+# Install MariaDB
+RUN apt-get update && apt-get install -y \
+    mariadb-server \
+    && rm -rf /var/lib/apt/lists/*
+
+# Configure MariaDB
+RUN mkdir -p /var/run/mysqld \
+    && chown -R mysql:mysql /var/run/mysqld \
+    && chown -R mysql:mysql /var/lib/mysql
+
+# Create initialization directory
+RUN mkdir -p /docker-entrypoint-initdb.d
+
+# Copy initialization script
+COPY ./config/mariadb/init/01-init.sql /docker-entrypoint-initdb.d/
+
+# Expose port
+EXPOSE 3306
+
+# Set entrypoint
+ENTRYPOINT ["mysqld"] 

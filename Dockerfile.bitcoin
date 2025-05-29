@@ -1,0 +1,36 @@
+FROM ubuntu:24.04
+
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    wget \
+    gnupg2 \
+    software-properties-common \
+    && rm -rf /var/lib/apt/lists/*
+
+# Add Bitcoin Core repository
+RUN wget -qO- https://raw.githubusercontent.com/bitcoin/bitcoin/master/contrib/gitian-keys/laanwj-releases.asc | gpg --dearmor > /usr/share/keyrings/bitcoin-archive-keyring.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/bitcoin-archive-keyring.gpg] https://bitcoin.org/bin/bitcoin-core-25.0/ $(lsb_release -cs) main" > /etc/apt/sources.list.d/bitcoin.list
+
+# Install Bitcoin Core
+RUN apt-get update && apt-get install -y \
+    bitcoind \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create bitcoin user
+RUN useradd -m -s /bin/bash bitcoin
+
+# Set up directories
+RUN mkdir -p /home/bitcoin/.bitcoin \
+    && chown -R bitcoin:bitcoin /home/bitcoin/.bitcoin
+
+# Switch to bitcoin user
+USER bitcoin
+
+# Expose ports
+EXPOSE 8332 8333
+
+# Set entrypoint
+ENTRYPOINT ["bitcoind"] 
