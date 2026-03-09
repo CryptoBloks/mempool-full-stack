@@ -421,6 +421,43 @@ validate_generated_files() {
             fail "config/cloudflared/config.yml does not exist (required for Cloudflare tunnel)"
         fi
     fi
+
+    # --- UFW rules file ---
+    local ufw_file="${config_dir}/ufw-rules.sh"
+    if check_file_exists "${ufw_file}" "config/ufw-rules.sh"; then
+        # Must contain basic UFW rules
+        check_file_contains "${ufw_file}" "ufw allow ssh" \
+            "config/ufw-rules.sh allows SSH"
+        check_file_contains "${ufw_file}" "ufw default deny incoming" \
+            "config/ufw-rules.sh sets default deny incoming"
+
+        # Must contain Docker UFW fix
+        check_file_contains "${ufw_file}" "ufw_docker_fix" \
+            "config/ufw-rules.sh contains Docker UFW fix function"
+        check_file_contains "${ufw_file}" "DOCKER-USER" \
+            "config/ufw-rules.sh references DOCKER-USER iptables chain"
+
+        # Check tunnel-aware rules
+        if [[ "${cf_enabled}" == "true" ]]; then
+            # When tunnel is enabled, web port should NOT be opened publicly
+            local web_port
+            web_port="$(get_config WEB_PORT 80)"
+            if grep -qE "ufw allow ${web_port}/tcp" "${ufw_file}" 2>/dev/null; then
+                warn_check "config/ufw-rules.sh opens web port ${web_port} publicly despite tunnel being enabled"
+            else
+                pass "config/ufw-rules.sh correctly restricts web port (tunnel mode)"
+            fi
+            check_file_contains "${ufw_file}" "Cloudflare Tunnel" \
+                "config/ufw-rules.sh documents tunnel-aware restrictions"
+        fi
+
+        # Bitcoin P2P ports should always be present
+        for net in "${network_list[@]}"; do
+            get_default_ports "${net}"
+            check_file_contains "${ufw_file}" "ufw allow ${BITCOIN_P2P_PORT}/tcp" \
+                "config/ufw-rules.sh allows Bitcoin P2P port ${BITCOIN_P2P_PORT} (${net})"
+        done
+    fi
 }
 
 # ==============================================================================
