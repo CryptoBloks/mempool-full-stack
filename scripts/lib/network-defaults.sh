@@ -26,14 +26,6 @@ fi
 readonly SUPPORTED_NETWORKS="mainnet signet testnet"
 
 ###############################################################################
-# get_all_networks()
-#   Prints the complete list of supported networks.
-###############################################################################
-get_all_networks() {
-    echo "${SUPPORTED_NETWORKS}"
-}
-
-###############################################################################
 # validate_network(network)
 #   Returns 0 if the given string is a valid network name, 1 otherwise.
 ###############################################################################

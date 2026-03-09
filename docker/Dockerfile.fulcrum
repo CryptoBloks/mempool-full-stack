@@ -1,46 +1,38 @@
 FROM ubuntu:24.04
 
-# Prevent interactive prompts during package installation
+# Build-from-source Dockerfile for Fulcrum (alternative electrum server).
+# Used only when per-network indexer choice is configured for Fulcrum.
+# The default indexer is electrs, pulled as a pre-built image from Docker Hub.
+
+ARG FULCRUM_VERSION=1.11.1
+
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install dependencies
+# Install build dependencies (Qt6 for Ubuntu 24.04)
 RUN apt-get update && apt-get install -y \
-    wget \
-    gnupg2 \
-    software-properties-common \
-    build-essential \
-    git \
-    cmake \
-    libssl-dev \
-    libboost-all-dev \
-    libzmq3-dev \
-    qt5-default \
-    qtbase5-dev \
-    qtchooser \
-    qt5-qmake \
+    build-essential git cmake \
+    libssl-dev libzmq3-dev \
+    qt6-base-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Clone and build Fulcrum
+# Clone, build, and install Fulcrum
 RUN git clone https://github.com/cculianu/Fulcrum.git /tmp/fulcrum \
     && cd /tmp/fulcrum \
-    && git checkout v1.9.0 \
-    && qmake \
-    && make -j$(nproc) \
-    && make install \
+    && git checkout "v${FULCRUM_VERSION}" \
+    && mkdir build && cd build \
+    && cmake .. \
+    && make -j"$(nproc)" \
+    && install -m 0755 Fulcrum /usr/local/bin/ \
     && rm -rf /tmp/fulcrum
 
-# Create fulcrum user
-RUN useradd -m -s /bin/bash fulcrum
+# Create fulcrum user and data directory
+RUN useradd -m -s /bin/bash -u 1000 fulcrum \
+    && mkdir -p /data \
+    && chown -R fulcrum:fulcrum /data
 
-# Set up directories
-RUN mkdir -p /home/fulcrum/.fulcrum \
-    && chown -R fulcrum:fulcrum /home/fulcrum/.fulcrum
-
-# Switch to fulcrum user
 USER fulcrum
+WORKDIR /data
 
-# Expose ports
 EXPOSE 50001 50002
 
-# Set entrypoint
-ENTRYPOINT ["Fulcrum"] 
+ENTRYPOINT ["Fulcrum"]

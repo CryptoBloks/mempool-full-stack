@@ -253,8 +253,12 @@ for comp in "${RESTORE_COMPONENTS[@]}"; do
     # Clear existing data
     if [[ -d "${TARGET_DIR}" ]]; then
         if [[ "${USE_BTRFS}" == "true" ]]; then
-            # Delete BTRFS subvolume and recreate
+            # Delete BTRFS subvolume (or fall back to rm) then recreate
             btrfs subvolume delete "${TARGET_DIR}" 2>/dev/null || rm -rf "${TARGET_DIR}"
+            if [[ -d "${TARGET_DIR}" ]]; then
+                log_error "Failed to remove existing directory: ${TARGET_DIR}"
+                continue
+            fi
             btrfs subvolume create "${TARGET_DIR}"
         else
             rm -rf "${TARGET_DIR}"
