@@ -34,7 +34,13 @@ config/testnet/
 config/openresty/
 config/cloudflared/
 config/mariadb/init/
+config/mariadb/my.cnf
 config/ufw-rules.sh
+
+# Legacy V1 config directories (replaced by per-network generated configs)
+config/bitcoin/
+config/fulcrum/
+config/mempool/
 
 # Node.js
 node_modules/
