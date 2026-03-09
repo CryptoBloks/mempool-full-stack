@@ -193,10 +193,14 @@ get_docker_image() {
 
     case "${service}" in
         bitcoin)
+            # TODO: Consider making the image configurable (BITCOIN_IMAGE in node.conf)
+            # to support alternatives like lncm/bitcoind or custom builds.
             local version="${BITCOIN_VERSION:-${RECOMMENDED_BITCOIN_VERSION}}"
             echo "mempool/bitcoin:${version}"
             ;;
         electrs)
+            # TODO: Support per-network indexer choice (Fulcrum as alternative).
+            # Would add: fulcrum) echo "cculianu/fulcrum:v${FULCRUM_VERSION}" ;;
             local version="${ELECTRS_VERSION:-${RECOMMENDED_ELECTRS_VERSION}}"
             echo "mempool/electrs:${version}"
             ;;
