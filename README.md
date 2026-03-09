@@ -72,7 +72,7 @@ All containers are built on Ubuntu 24.04 LTS, providing:
 - 50002: Fulcrum SSL
 - 3306: MariaDB
 
-All internal services are protected and only accessible within the Docker network. For detailed security information, see [Security Documentation](.project/SECURITY.md).
+All internal services are protected and only accessible within the Docker network. For detailed security information, see [AGENTS.md](AGENTS.md).
 
 ## Building from Source
 
@@ -157,7 +157,7 @@ docker-compose logs -f bitcoin
 5. SSL certificates for Fulcrum are automatically generated during setup
 6. MariaDB credentials should be changed from defaults in production
 7. Keep your `.env` file secure and never commit it to version control
-8. Review and follow the [Security Documentation](.project/SECURITY.md) for best practices
+8. Review and follow the [AGENTS.md](AGENTS.md) for best practices
 
 ## Maintenance
 
@@ -229,9 +229,7 @@ docker-compose ps
 │   ├── fulcrum/
 │   ├── mempool/
 │   └── mariadb/
-├── .project/
-│   ├── COMMANDS.md
-│   └── SECURITY.md
+├── AGENTS.md
 ├── Dockerfile.bitcoin
 ├── Dockerfile.fulcrum
 ├── Dockerfile.mariadb
