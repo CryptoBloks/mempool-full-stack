@@ -86,6 +86,16 @@ if [[ -z "${NETWORK}" ]]; then
     log_header "Starting All Services"
     log_info "Starting full stack..."
     docker compose up -d
+
+    # Ensure databases exist for all configured networks (idempotent).
+    # The entrypoint init only runs on first MariaDB start, so if networks
+    # were added after initial setup, this ensures the new databases are created.
+    local init_sql="${PROJECT_ROOT}/config/mariadb/init/01-init.sql"
+    if [[ -f "${init_sql}" ]]; then
+        log_info "Ensuring MariaDB databases exist..."
+        docker compose exec -T mariadb mariadb -u root -p"$(get_config MARIADB_ROOT_PASS)" < "${init_sql}" 2>/dev/null || true
+    fi
+
     log_success "All services started."
 else
     log_header "Starting ${NETWORK} Services"
@@ -104,6 +114,13 @@ else
     # Start shared services first
     log_info "Starting shared services: ${SHARED_SERVICES[*]}"
     docker compose up -d "${SHARED_SERVICES[@]}"
+
+    # Ensure databases exist (in case this network was added after initial setup)
+    local init_sql="${PROJECT_ROOT}/config/mariadb/init/01-init.sql"
+    if [[ -f "${init_sql}" ]]; then
+        log_info "Ensuring MariaDB databases exist..."
+        docker compose exec -T mariadb mariadb -u root -p"$(get_config MARIADB_ROOT_PASS)" < "${init_sql}" 2>/dev/null || true
+    fi
 
     # Start network services
     log_info "Starting ${NETWORK} services: ${NETWORK_SERVICES[*]}"

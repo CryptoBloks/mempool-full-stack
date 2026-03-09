@@ -491,6 +491,9 @@ generate_mempool_conf() {
 
 # generate_mariadb_init
 #   Renders config/mariadb/init/01-init.sql from the template.
+#   Note: Docker entrypoint only runs init scripts on first MariaDB start.
+#   If networks are added later, start.sh will apply the init SQL to ensure
+#   new databases exist. The SQL is idempotent (CREATE DATABASE IF NOT EXISTS).
 generate_mariadb_init() {
     local mariadb_user
     mariadb_user="$(get_config MARIADB_USER mempool)"
@@ -826,6 +829,10 @@ generate_compose() {
     security_block="$(_compose_security_block "    ")"
 
     # ==== Build per-network services ====
+    # TODO: Currently uses a single global indexer (electrs) for all networks.
+    # Future: support per-network indexer choice (e.g., Fulcrum for mainnet,
+    # Electrs for signet/testnet). Would require {NET}_INDEXER config keys and
+    # conditional template/image selection in this loop.
     local network_services=""
     local net
     for net in "${networks[@]}"; do
