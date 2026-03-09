@@ -23,6 +23,18 @@ logs/
 # Docker
 .docker/
 docker-compose.override.yml
+docker-compose.yml
+
+# Generated configs (from generate-config.sh) — only templates are tracked
+node.conf
+node.conf.backup.*
+config/mainnet/
+config/signet/
+config/testnet/
+config/openresty/
+config/cloudflared/
+config/mariadb/init/
+config/ufw-rules.sh
 
 # Node.js
 node_modules/
