@@ -591,32 +591,68 @@ generate_nginx_conf() {
     local rpc_enabled
     rpc_enabled="$(get_config RPC_ENDPOINT_ENABLED false)"
     if [[ "${rpc_enabled}" == "true" ]]; then
-        local rpc_port
-        rpc_port="$(get_config RPC_PORT 3000)"
-
-        rpc_location+="        location /rpc {"$'\n'
-        rpc_location+="            access_by_lua_file /etc/openresty/jsonrpc-access.lua;"$'\n'
-        rpc_location+=$'\n'
-
-        # Route to the first enabled network's bitcoind RPC
-        local primary_net="${networks[0]}"
-        get_default_ports "${primary_net}"
-        get_chain_params "${primary_net}"
-
-        local gw_user gw_pass
+        local gw_user gw_pass basic_auth
         gw_user="$(get_config GATEWAY_RPC_USER gateway)"
         gw_pass="$(get_config GATEWAY_RPC_PASS)"
-
-        # Pre-compute Base64-encoded credentials for HTTP Basic Auth
-        local basic_auth
         basic_auth="$(printf '%s:%s' "${gw_user}" "${gw_pass}" | base64 -w0)"
 
-        rpc_location+="            proxy_pass http://bitcoind-${primary_net}:${CHAIN_RPC_PORT}/;"$'\n'
-        rpc_location+="            proxy_set_header Authorization \"Basic ${basic_auth}\";"$'\n'
-        rpc_location+="            proxy_set_header Content-Type application/json;"$'\n'
-        rpc_location+="            proxy_http_version 1.1;"$'\n'
-        rpc_location+="            proxy_set_header Connection \"\";"$'\n'
-        rpc_location+="        }"
+        # CORS headers shared across all RPC locations
+        local cors_headers=""
+        cors_headers+="            add_header Access-Control-Allow-Origin \"*\" always;"$'\n'
+        cors_headers+="            add_header Access-Control-Allow-Methods \"POST, OPTIONS\" always;"$'\n'
+        cors_headers+="            add_header Access-Control-Allow-Headers \"Content-Type, X-API-Key\" always;"$'\n'
+
+        # Shared proxy settings for all RPC locations
+        local proxy_common=""
+        proxy_common+="            proxy_set_header Authorization \"Basic ${basic_auth}\";"$'\n'
+        proxy_common+="            proxy_set_header Content-Type application/json;"$'\n'
+        proxy_common+="            proxy_http_version 1.1;"$'\n'
+        proxy_common+="            proxy_set_header Connection \"\";"
+
+        # Helper: emit a single RPC location block
+        # _rpc_location_block LOCATION_PATH BITCOIND_HOST RPC_PORT
+        _rpc_location_block() {
+            local loc_path="$1"
+            local btc_host="$2"
+            local btc_rpc_port="$3"
+            local block=""
+            block+="        location ~ ^${loc_path}$ {"$'\n'
+            block+="            access_by_lua_file /etc/openresty/jsonrpc-access.lua;"$'\n'
+            block+="${cors_headers}"
+            block+=$'\n'
+            block+="            # Handle CORS preflight"$'\n'
+            block+="            if (\$request_method = OPTIONS) {"$'\n'
+            block+="                add_header Access-Control-Allow-Origin \"*\";"$'\n'
+            block+="                add_header Access-Control-Allow-Methods \"POST, OPTIONS\";"$'\n'
+            block+="                add_header Access-Control-Allow-Headers \"Content-Type, X-API-Key\";"$'\n'
+            block+="                add_header Content-Length 0;"$'\n'
+            block+="                add_header Content-Type text/plain;"$'\n'
+            block+="                return 204;"$'\n'
+            block+="            }"$'\n'
+            block+=$'\n'
+            block+="            proxy_pass http://${btc_host}:${btc_rpc_port}/;"$'\n'
+            block+="${proxy_common}"$'\n'
+            block+="        }"
+            printf '%s' "${block}"
+        }
+
+        # Default RPC route: /rpc/v1/{key} → primary network's bitcoind
+        local primary_net="${networks[0]}"
+        get_chain_params "${primary_net}"
+        local primary_rpc_port="${CHAIN_RPC_PORT}"
+
+        rpc_location+="$(_rpc_location_block "/rpc/v1/[^/]+" "bitcoind-${primary_net}" "${primary_rpc_port}")"
+
+        # Per-network explicit routes: /rpc/v1/{key}/{network}
+        local rpc_net
+        for rpc_net in "${networks[@]}"; do
+            get_chain_params "${rpc_net}"
+            rpc_location+=$'\n\n'
+            rpc_location+="$(_rpc_location_block "/rpc/v1/[^/]+/${rpc_net}" "bitcoind-${rpc_net}" "${CHAIN_RPC_PORT}")"
+        done
+
+        # Clean up the helper function
+        unset -f _rpc_location_block
     else
         rpc_location="        # (RPC gateway not enabled)"
     fi

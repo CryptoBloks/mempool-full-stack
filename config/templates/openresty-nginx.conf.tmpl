@@ -16,6 +16,9 @@ http {
     sendfile        on;
     keepalive_timeout 65;
 
+    # Shared memory zone for RPC rate limiting (10MB)
+    lua_shared_dict rpc_limit 10m;
+
     # Upstream definitions (per-network)
 {{UPSTREAM_BLOCKS}}
 
