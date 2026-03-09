@@ -67,3 +67,7 @@ tmp/
 ehthumbs.db
 Thumbs.db
 _tmp/
+.claude/
+.cursor/
+.gemini/
+.codex/
