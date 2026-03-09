@@ -311,36 +311,6 @@ validate_url() {
     return 1
 }
 
-# check_disk_space PATH MIN_GB
-#   Return 0 if the filesystem containing PATH has at least MIN_GB gigabytes
-#   of available space, 1 otherwise. Prints actual available GB to stderr on
-#   failure.
-check_disk_space() {
-    local path="$1"
-    local min_gb="$2"
-
-    if [[ ! -e "$path" ]]; then
-        log_error "check_disk_space: path '${path}' does not exist."
-        return 1
-    fi
-
-    # df -BG gives sizes in 1G blocks; 'Available' is column 4.
-    local avail_gb
-    avail_gb=$(df -BG "$path" | awk 'NR==2 { gsub(/G/, "", $4); print $4 }')
-
-    if [[ -z "$avail_gb" ]]; then
-        log_error "check_disk_space: unable to determine available space for '${path}'."
-        return 1
-    fi
-
-    if [[ "$avail_gb" -lt "$min_gb" ]]; then
-        log_error "Insufficient disk space on '${path}': ${avail_gb}G available, ${min_gb}G required."
-        return 1
-    fi
-
-    return 0
-}
-
 # ==============================================================================
 # UTILITIES
 # ==============================================================================
@@ -363,28 +333,6 @@ require_command() {
 
     log_error "$msg"
     return 1
-}
-
-# require_root
-#   Exit with an error if the current user is not root.
-require_root() {
-    if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
-        log_error "This script must be run as root (or with sudo)."
-        exit 1
-    fi
-}
-
-# detect_interfaces
-#   List active network interfaces (excluding loopback), one per line on stdout.
-detect_interfaces() {
-    if command -v ip &>/dev/null; then
-        ip -o link show up | awk -F': ' '{print $2}' | grep -v '^lo$'
-    elif command -v ifconfig &>/dev/null; then
-        ifconfig -a | awk '/^[a-zA-Z0-9]/ {gsub(/:$/, "", $1); print $1}' | grep -v '^lo$'
-    else
-        log_warn "Neither 'ip' nor 'ifconfig' found; cannot detect interfaces."
-        return 1
-    fi
 }
 
 # generate_password [LENGTH]

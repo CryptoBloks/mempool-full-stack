@@ -1164,10 +1164,20 @@ generate_ufw_rules() {
         exposed_ports+=("${BITCOIN_P2P_PORT}")
     done
 
+    # Deduplicate exposed ports
+    local -a unique_ports=()
+    local -A _seen_ports=()
+    for port in "${exposed_ports[@]}"; do
+        if [[ -z "${_seen_ports["${port}"]:-}" ]]; then
+            unique_ports+=("${port}")
+            _seen_ports["${port}"]=1
+        fi
+    done
+
     # Generate iptables rules for each allowed port
     docker_fix+="    # Allow specific ports through Docker"$'\n'
     local port
-    for port in "${exposed_ports[@]}"; do
+    for port in "${unique_ports[@]}"; do
         docker_fix+="    iptables -I DOCKER-USER -p tcp --dport ${port} -j RETURN"$'\n'
     done
 

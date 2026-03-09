@@ -58,10 +58,14 @@ load_config() {
         # Skip lines without an '='
         [[ "${key}" == "${line}" ]] && continue
 
-        # Skip keys that are empty after trimming
+        # Trim key whitespace
         key="${key#"${key%%[![:space:]]*}"}"
         key="${key%"${key##*[![:space:]]}"}"
         [[ -z "${key}" ]] && continue
+
+        # Trim value whitespace
+        value="${value#"${value%%[![:space:]]*}"}"
+        value="${value%"${value##*[![:space:]]}"}"
 
         _CONFIG["${key}"]="${value}"
     done < "${file}"
@@ -140,60 +144,6 @@ set_config() {
 config_exists() {
     local key="${1:?config_exists: KEY is required}"
     [[ -n "${_CONFIG["${key}"]+_set}" ]]
-}
-
-###############################################################################
-# remove_config KEY
-#   Removes KEY from both the in-memory _CONFIG array and the file on disk.
-###############################################################################
-remove_config() {
-    local key="${1:?remove_config: KEY is required}"
-    local file="${NODE_CONF}"
-
-    # Remove from in-memory array
-    unset '_CONFIG['"${key}"']'
-
-    # If there is no file on disk, nothing else to do
-    [[ -f "${file}" ]] || return 0
-
-    local tmpfile
-    tmpfile="$(mktemp "${file}.tmp.XXXXXX")"
-
-    local line line_key
-    while IFS= read -r line || [[ -n "${line}" ]]; do
-        if [[ ! "${line}" =~ ^[[:space:]]*# ]] && [[ "${line}" == *"="* ]]; then
-            line_key="${line%%=*}"
-            line_key="${line_key#"${line_key%%[![:space:]]*}"}"
-            line_key="${line_key%"${line_key##*[![:space:]]}"}"
-            if [[ "${line_key}" == "${key}" ]]; then
-                continue
-            fi
-        fi
-        printf '%s\n' "${line}" >> "${tmpfile}"
-    done < "${file}"
-
-    mv -f "${tmpfile}" "${file}"
-}
-
-###############################################################################
-# backup_config
-#   Creates a timestamped copy of node.conf:
-#     node.conf  →  node.conf.backup.YYYYMMDD_HHMMSS
-###############################################################################
-backup_config() {
-    local file="${NODE_CONF}"
-
-    if [[ ! -f "${file}" ]]; then
-        echo "backup_config: ${file} does not exist, nothing to back up" >&2
-        return 1
-    fi
-
-    local timestamp
-    timestamp="$(date '+%Y%m%d_%H%M%S')"
-    local backup="${file}.backup.${timestamp}"
-
-    cp -a "${file}" "${backup}"
-    printf '%s\n' "${backup}"
 }
 
 ###############################################################################

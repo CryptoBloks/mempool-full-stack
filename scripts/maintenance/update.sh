@@ -141,6 +141,13 @@ fi
 
 cd "${PROJECT_ROOT}"
 
+# Back up node.conf before making changes so we can roll back on failure
+BACKUP_CONF=""
+if [[ -f "${PROJECT_ROOT}/node.conf" ]]; then
+    BACKUP_CONF="${PROJECT_ROOT}/node.conf.pre-update"
+    cp -a "${PROJECT_ROOT}/node.conf" "${BACKUP_CONF}"
+fi
+
 # Update Bitcoin Core version in node.conf
 if [[ -n "${LATEST_BITCOIN}" && "${CURRENT_BITCOIN}" != "${LATEST_BITCOIN}" ]]; then
     log_info "Updating Bitcoin Core: ${CURRENT_BITCOIN} -> ${LATEST_BITCOIN}"
@@ -156,14 +163,29 @@ fi
 # Regenerate configuration files
 log_info "Regenerating configuration..."
 if [[ -x "${PROJECT_ROOT}/scripts/setup/generate-config.sh" ]]; then
-    "${PROJECT_ROOT}/scripts/setup/generate-config.sh"
+    if ! "${PROJECT_ROOT}/scripts/setup/generate-config.sh"; then
+        log_error "Config regeneration failed. Rolling back node.conf."
+        if [[ -n "${BACKUP_CONF}" ]]; then
+            mv -f "${BACKUP_CONF}" "${PROJECT_ROOT}/node.conf"
+        fi
+        exit 1
+    fi
 else
     log_warn "generate-config.sh not found or not executable. Skipping config regeneration."
 fi
 
 # Pull new images
 log_info "Pulling new Docker images..."
-docker compose pull
+if ! docker compose pull; then
+    log_error "Image pull failed. Rolling back node.conf."
+    if [[ -n "${BACKUP_CONF}" ]]; then
+        mv -f "${BACKUP_CONF}" "${PROJECT_ROOT}/node.conf"
+    fi
+    exit 1
+fi
+
+# Clean up backup on success path
+[[ -n "${BACKUP_CONF}" && -f "${BACKUP_CONF}" ]] && rm -f "${BACKUP_CONF}"
 
 # Recreate containers with new images
 log_info "Recreating containers..."
