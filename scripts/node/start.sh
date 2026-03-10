@@ -136,7 +136,7 @@ if [[ -z "${NETWORK}" ]]; then
     fi
 
     # Apply firewall rules (ufw-docker rules require running containers)
-    local ufw_rules="${PROJECT_ROOT}/config/ufw-rules.sh"
+    ufw_rules="${PROJECT_ROOT}/config/ufw-rules.sh"
     if [[ -f "${ufw_rules}" ]] && [[ "$(get_config UFW_ENABLED "true")" == "true" ]]; then
         log_info "Applying firewall rules..."
         bash "${ufw_rules}"
