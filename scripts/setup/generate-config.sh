@@ -298,6 +298,17 @@ get_electrs_network() {
     esac
 }
 
+# Maps our network name to electrs CLI --network value (differs from toml config).
+get_electrs_cli_network() {
+    local network="$1"
+    case "${network}" in
+        mainnet)  printf 'mainnet' ;;
+        signet)   printf 'signet' ;;
+        testnet)  printf 'testnet' ;;
+        *)        log_error "Unknown network: ${network}"; return 1 ;;
+    esac
+}
+
 # ==============================================================================
 # Helper: get_network_section NETWORK
 #   Maps our network name to bitcoin.conf [section] name.
@@ -922,7 +933,7 @@ generate_compose() {
 
         # --- electrs ---
         local electrs_network
-        electrs_network="$(get_electrs_network "${net}")"
+        electrs_network="$(get_electrs_cli_network "${net}")"
         local rpc_user rpc_pass
         rpc_user="$(get_config BITCOIN_RPC_USER)"
         rpc_pass="$(get_config BITCOIN_RPC_PASS)"
