@@ -931,7 +931,6 @@ generate_compose() {
         network_services+="    image: ${electrs_image}"$'\n'
         network_services+="    container_name: electrs-${net}"$'\n'
         network_services+="    command:"$'\n'
-        network_services+="      - /bin/electrs"$'\n'
         network_services+="      - --network"$'\n'
         network_services+="      - ${electrs_network}"$'\n'
         network_services+="      - --daemon-rpc-addr"$'\n'
