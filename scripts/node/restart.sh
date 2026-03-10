@@ -40,7 +40,7 @@ done
 log_header "Restarting Services"
 
 log_info "Stopping services..."
-"${_SCRIPT_DIR}/stop.sh" "${ARGS[@]}"
+"${_SCRIPT_DIR}/stop.sh" "${ARGS[@]}" || log_warn "Stop encountered errors, proceeding with start..."
 
 log_info "Starting services..."
 "${_SCRIPT_DIR}/start.sh" "${ARGS[@]}"

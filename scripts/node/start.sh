@@ -82,6 +82,35 @@ fi
 # ==============================================================================
 cd "${PROJECT_ROOT}"
 
+# Create BTRFS subvolumes if enabled (must happen before docker compose up,
+# because Docker bind-mounts create regular directories if they don't exist)
+if [[ "$(get_config BTRFS_ENABLED "false")" == "true" ]]; then
+    STORAGE_PATH="$(get_config STORAGE_PATH "/data/mempool")"
+
+    # Collect all data directories that need to be subvolumes
+    mapfile -t _nets < <(get_networks)
+    declare -a _btrfs_dirs=()
+    for _net in "${_nets[@]}"; do
+        _btrfs_dirs+=("${STORAGE_PATH}/${_net}/bitcoin")
+        _btrfs_dirs+=("${STORAGE_PATH}/${_net}/electrs")
+        _btrfs_dirs+=("${STORAGE_PATH}/${_net}/mempool")
+    done
+    _btrfs_dirs+=("${STORAGE_PATH}/mariadb")
+
+    for _dir in "${_btrfs_dirs[@]}"; do
+        if [[ ! -d "${_dir}" ]]; then
+            # Create parent directory first
+            mkdir -p "$(dirname "${_dir}")"
+            if btrfs subvolume create "${_dir}" 2>/dev/null; then
+                log_info "Created BTRFS subvolume: ${_dir}"
+            else
+                log_warn "Failed to create BTRFS subvolume: ${_dir} (falling back to mkdir)"
+                mkdir -p "${_dir}"
+            fi
+        fi
+    done
+fi
+
 if [[ -z "${NETWORK}" ]]; then
     log_header "Starting All Services"
     log_info "Starting full stack..."
