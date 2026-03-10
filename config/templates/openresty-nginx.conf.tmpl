@@ -2,8 +2,8 @@
 # DO NOT EDIT — regenerate with: ./scripts/setup/generate-config.sh
 
 worker_processes auto;
-error_log /var/log/openresty/error.log warn;
-pid /run/openresty.pid;
+error_log stderr warn;
+pid /usr/local/openresty/nginx/logs/nginx.pid;
 
 events {
     worker_connections 1024;
