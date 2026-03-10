@@ -325,7 +325,7 @@ section_storage() {
 
     if ${NON_INTERACTIVE}; then
         wiz_set STORAGE_PATH "${default_path}"
-        wiz_set BTRFS_ENABLED "$(wiz_default BTRFS_ENABLED "false")"
+        wiz_set BTRFS_ENABLED "true"
         log_info "Storage path: ${default_path}"
         return
     fi
@@ -349,29 +349,18 @@ section_storage() {
         log_warn "Path does not exist. It will be created during deployment."
     fi
 
-    # Check BTRFS
-    local btrfs_enabled="false"
-    if [[ -d "${storage_path}" ]]; then
-        local fstype
-        fstype="$(df -T "${storage_path}" 2>/dev/null | awk 'NR==2 {print $2}')" || true
-        if [[ "${fstype}" == "btrfs" ]]; then
-            log_success "BTRFS filesystem detected (recommended for snapshots)"
-            if ask_yes_no "Enable BTRFS snapshot support?" "y"; then
-                btrfs_enabled="true"
-            fi
-        else
-            log_info "Filesystem type: ${fstype:-unknown} (BTRFS recommended for snapshots)"
-        fi
+    # BTRFS is always enabled — snapshots require it
+    wiz_set BTRFS_ENABLED "true"
+    log_info "BTRFS snapshot support: enabled"
 
-        # Check available space
+    # Check available space if path exists
+    if [[ -d "${storage_path}" ]]; then
         local avail_gb
         avail_gb="$(df -BG "${storage_path}" | awk 'NR==2 { gsub(/G/, "", $4); print $4 }')" || true
         if [[ -n "${avail_gb}" ]]; then
             log_info "Available space: ${avail_gb}GB"
         fi
     fi
-
-    wiz_set BTRFS_ENABLED "${btrfs_enabled}"
     log_success "Storage configured: ${storage_path}"
 }
 
@@ -688,7 +677,7 @@ section_cloudflare() {
         wiz_set CLOUDFLARE_TUNNEL_ENABLED "true"
 
         local token
-        token="$(ask_secret "Cloudflare Tunnel token (from Zero Trust dashboard)")"
+        token="$(ask_input "Cloudflare Tunnel token (from Zero Trust dashboard)" "")"
         wiz_set CLOUDFLARE_TUNNEL_TOKEN "${token}"
 
         if ask_yes_no "Expose Mempool web via tunnel?" "y"; then
