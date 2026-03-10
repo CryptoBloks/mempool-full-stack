@@ -640,6 +640,7 @@ generate_nginx_conf() {
             block+="                return 204;"$'\n'
             block+="            }"$'\n'
             block+=$'\n'
+            block+="            rewrite ^.* / break;"$'\n'
             block+="            proxy_pass http://${btc_host}:${btc_rpc_port};"$'\n'
             block+="${proxy_common}"$'\n'
             block+="        }"
