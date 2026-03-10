@@ -854,14 +854,18 @@ generate_compose() {
         get_default_ports "${net}"
         get_chain_params "${net}"
 
-        local bitcoin_image electrs_image mempool_api_image
-        bitcoin_image="$(get_docker_image bitcoin)"
+        local bitcoin_version electrs_image mempool_api_image
+        bitcoin_version="${BITCOIN_VERSION:-${RECOMMENDED_BITCOIN_VERSION}}"
         electrs_image="$(get_docker_image electrs)"
         mempool_api_image="$(get_docker_image mempool-api)"
 
         # --- bitcoind ---
         network_services+="  bitcoind-${net}:"$'\n'
-        network_services+="    image: ${bitcoin_image}"$'\n'
+        network_services+="    build:"$'\n'
+        network_services+="      context: ."$'\n'
+        network_services+="      dockerfile: docker/Dockerfile.bitcoin"$'\n'
+        network_services+="      args:"$'\n'
+        network_services+="        BITCOIN_VERSION: \"${bitcoin_version}\""$'\n'
         network_services+="    container_name: bitcoind-${net}"$'\n'
         network_services+="    volumes:"$'\n'
         network_services+="      - ${storage_path}/${net}/bitcoin:/data/.bitcoin"$'\n'

@@ -109,14 +109,14 @@ get_bitcoin_network_flag() {
 #   current recommended software versions.
 ###############################################################################
 get_default_versions() {
-    RECOMMENDED_BITCOIN_VERSION="28.1"
-    RECOMMENDED_MEMPOOL_VERSION="3.1.0"
+    RECOMMENDED_BITCOIN_VERSION="30.2"
+    RECOMMENDED_MEMPOOL_VERSION="3.2.1"
     RECOMMENDED_ELECTRS_VERSION="latest"
-    RECOMMENDED_MARIADB_VERSION="10.11"
-    RECOMMENDED_OPENRESTY_VERSION="alpine"
+    RECOMMENDED_MARIADB_VERSION="11.8"
+    RECOMMENDED_OPENRESTY_VERSION="1.29.2.1-alpine"
 
-    SUPPORTED_BITCOIN_VERSIONS=(28.1 28.0 27.2)
-    SUPPORTED_MEMPOOL_VERSIONS=(3.1.0 3.0.0)
+    SUPPORTED_BITCOIN_VERSIONS=(30.2 28.1 28.0)
+    SUPPORTED_MEMPOOL_VERSIONS=(3.2.1 3.1.0)
 }
 
 ###############################################################################
