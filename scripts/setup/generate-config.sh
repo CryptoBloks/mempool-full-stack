@@ -1110,19 +1110,15 @@ generate_ufw_rules() {
     local tunnel_enabled
     tunnel_enabled="$(get_config CLOUDFLARE_TUNNEL_ENABLED false)"
 
-    # Allow SSH
-    ufw_rules+="ufw allow ssh"$'\n'
-    ufw_rules+=$'\n'
+    local bind_ip
+    bind_ip="$(get_config BIND_IP "127.0.0.1")"
 
-    # Allow web port
     local web_port
     web_port="$(get_config WEB_PORT 80)"
 
-    # Allow TLS if configured
     local tls_mode
     tls_mode="$(get_config TLS_MODE none)"
 
-    # RPC port (if enabled)
     local rpc_enabled
     rpc_enabled="$(get_config RPC_ENDPOINT_ENABLED false)"
     local rpc_port=""
@@ -1130,13 +1126,19 @@ generate_ufw_rules() {
         rpc_port="$(get_config RPC_PORT 3000)"
     fi
 
+    # Derive LAN subnet from bind IP (assume /24)
+    local lan_subnet=""
+    if [[ "${bind_ip}" != "127.0.0.1" ]]; then
+        lan_subnet="${bind_ip%.*}.0/24"
+    fi
+
+    # --- Standard UFW rules (host-level) ---
+    ufw_rules+="ufw allow ssh"$'\n'
+    ufw_rules+=$'\n'
+
     if [[ "${tunnel_enabled}" == "true" ]]; then
-        # Tunnel-aware mode: web/RPC traffic flows through Cloudflare Tunnel,
-        # so those ports do NOT need to be open to the public internet.
-        # Only SSH and Bitcoin P2P ports are exposed externally.
         ufw_rules+="# Cloudflare Tunnel is enabled — web and RPC ports are NOT opened publicly."$'\n'
-        ufw_rules+="# All web/API traffic is routed through the Cloudflare Tunnel."$'\n'
-        ufw_rules+="# Only SSH and Bitcoin P2P ports are allowed from the outside."$'\n'
+        ufw_rules+="# All external web/API traffic is routed through the Cloudflare Tunnel."$'\n'
         ufw_rules+=$'\n'
     else
         ufw_rules+="# Web traffic"$'\n'
@@ -1153,7 +1155,7 @@ generate_ufw_rules() {
         fi
     fi
 
-    # Allow Bitcoin P2P ports (always needed, even with tunnel)
+    # Bitcoin P2P ports (always needed, even with tunnel)
     ufw_rules+="# Bitcoin P2P ports"$'\n'
     local net
     for net in "${networks[@]}"; do
@@ -1162,91 +1164,65 @@ generate_ufw_rules() {
     done
 
     ufw_rules+=$'\n'
-
-    # Default deny and enable
     ufw_rules+="# Default policy"$'\n'
     ufw_rules+="ufw default deny incoming"$'\n'
     ufw_rules+="ufw default allow outgoing"$'\n'
     ufw_rules+="ufw --force enable"
 
-    # --- Build Docker UFW fix ---
-    # Docker bypasses UFW by default (adds its own iptables rules).
-    # The DOCKER-USER chain lets us enforce firewall rules on Docker traffic.
-    local docker_fix=""
-    docker_fix+="# Docker UFW fix — prevent Docker from bypassing UFW"$'\n'
-    docker_fix+="# Docker manipulates iptables directly, which bypasses UFW rules."$'\n'
-    docker_fix+="# The DOCKER-USER chain is the official way to add custom rules"$'\n'
-    docker_fix+="# that Docker will respect. See: https://docs.docker.com/network/iptables/"$'\n'
-    docker_fix+="ufw_docker_fix() {"$'\n'
-    docker_fix+="    # Only apply if Docker is installed"$'\n'
-    docker_fix+="    if ! command -v docker &>/dev/null; then return 0; fi"$'\n'
-    docker_fix+=""$'\n'
-    docker_fix+="    echo \"Applying Docker UFW fix (DOCKER-USER chain)...\""$'\n'
-    docker_fix+=""$'\n'
-    docker_fix+="    # Flush existing DOCKER-USER rules to avoid duplicates"$'\n'
-    docker_fix+="    iptables -F DOCKER-USER 2>/dev/null || true"$'\n'
-    docker_fix+=""$'\n'
-    docker_fix+="    # Default: drop all incoming traffic to Docker containers"$'\n'
-    docker_fix+="    iptables -I DOCKER-USER -j DROP"$'\n'
-    docker_fix+=""$'\n'
-    docker_fix+="    # Allow established/related connections (responses to outgoing requests)"$'\n'
-    docker_fix+="    iptables -I DOCKER-USER -m conntrack --ctstate ESTABLISHED,RELATED -j RETURN"$'\n'
-    docker_fix+=""$'\n'
-    docker_fix+="    # Allow traffic from Docker's internal networks (container-to-container)"$'\n'
-    docker_fix+="    iptables -I DOCKER-USER -s 172.16.0.0/12 -j RETURN"$'\n'
-    docker_fix+=""$'\n'
+    # --- ufw-docker rules (Docker container access) ---
+    local docker_rules=""
+    docker_rules+="# ufw-docker rules — allow traffic to Docker containers"$'\n'
+    docker_rules+="# ufw-docker integrates UFW with Docker's iptables rules."$'\n'
+    docker_rules+="# See: https://github.com/chaifeng/ufw-docker"$'\n'
+    docker_rules+=$'\n'
 
-    # Collect exposed ports that need to be allowed through Docker
-    local -a exposed_ports=()
+    # Bitcoin P2P ports — open to all (needed for network connectivity)
+    docker_rules+="# Bitcoin P2P — open to all"$'\n'
+    for net in "${networks[@]}"; do
+        get_default_ports "${net}"
+        docker_rules+="ufw-docker allow bitcoind-${net} ${BITCOIN_P2P_PORT}/tcp"$'\n'
+    done
+    docker_rules+=$'\n'
 
-    if [[ "${tunnel_enabled}" != "true" ]]; then
-        # Web port
-        exposed_ports+=("${web_port}")
+    if [[ "${tunnel_enabled}" == "true" ]]; then
+        # With tunnel: web/RPC only accessible from LAN (if bind IP is not localhost)
+        if [[ -n "${lan_subnet}" ]]; then
+            docker_rules+="# Web — LAN access only (external traffic via Cloudflare Tunnel)"$'\n'
+            docker_rules+="ufw-docker allow openresty ${web_port}/tcp ${lan_subnet}"$'\n'
+            if [[ "${tls_mode}" != "none" ]]; then
+                docker_rules+="ufw-docker allow openresty 443/tcp ${lan_subnet}"$'\n'
+            fi
+            docker_rules+=$'\n'
 
-        # TLS port
-        if [[ "${tls_mode}" != "none" ]]; then
-            exposed_ports+=(443)
+            if [[ "${rpc_enabled}" == "true" ]] && [[ -n "${rpc_port}" ]]; then
+                docker_rules+="# RPC — LAN access only"$'\n'
+                docker_rules+="ufw-docker allow openresty ${rpc_port}/tcp ${lan_subnet}"$'\n'
+                docker_rules+=$'\n'
+            fi
+        else
+            docker_rules+="# Web/RPC bound to localhost — no ufw-docker rules needed"$'\n'
+            docker_rules+="# All external traffic flows through Cloudflare Tunnel"$'\n'
+            docker_rules+=$'\n'
         fi
+    else
+        # No tunnel: web/RPC open to all
+        docker_rules+="# Web — open to all"$'\n'
+        docker_rules+="ufw-docker allow openresty ${web_port}/tcp"$'\n'
+        if [[ "${tls_mode}" != "none" ]]; then
+            docker_rules+="ufw-docker allow openresty 443/tcp"$'\n'
+        fi
+        docker_rules+=$'\n'
 
-        # RPC port
         if [[ "${rpc_enabled}" == "true" ]] && [[ -n "${rpc_port}" ]]; then
-            exposed_ports+=("${rpc_port}")
+            docker_rules+="# RPC — open to all"$'\n'
+            docker_rules+="ufw-docker allow openresty ${rpc_port}/tcp"$'\n'
+            docker_rules+=$'\n'
         fi
     fi
 
-    # Bitcoin P2P ports (always needed)
-    for net in "${networks[@]}"; do
-        get_default_ports "${net}"
-        exposed_ports+=("${BITCOIN_P2P_PORT}")
-    done
-
-    # Deduplicate exposed ports
-    local -a unique_ports=()
-    local -A _seen_ports=()
-    for port in "${exposed_ports[@]}"; do
-        if [[ -z "${_seen_ports["${port}"]:-}" ]]; then
-            unique_ports+=("${port}")
-            _seen_ports["${port}"]=1
-        fi
-    done
-
-    # Generate iptables rules for each allowed port
-    docker_fix+="    # Allow specific ports through Docker"$'\n'
-    local port
-    for port in "${unique_ports[@]}"; do
-        docker_fix+="    iptables -I DOCKER-USER -p tcp --dport ${port} -j RETURN"$'\n'
-    done
-
-    docker_fix+=""$'\n'
-    docker_fix+="    echo \"Docker UFW fix applied successfully.\""$'\n'
-    docker_fix+="}"$'\n'
-    docker_fix+=""$'\n'
-    docker_fix+="# Run the Docker fix"$'\n'
-    docker_fix+="ufw_docker_fix"
-
     declare -A ufw_vars=(
         [UFW_RULES]="${ufw_rules}"
-        [UFW_DOCKER_FIX]="${docker_fix}"
+        [UFW_DOCKER_FIX]="${docker_rules}"
     )
 
     local output
