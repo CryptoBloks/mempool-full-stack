@@ -110,10 +110,6 @@ if [[ "$(get_config BTRFS_ENABLED "false")" == "true" ]]; then
         fi
     done
 
-    # Fix ownership on bitcoin data directories (container runs as UID 10000)
-    for _net in "${_nets[@]}"; do
-        chown -R 10000:10000 "${STORAGE_PATH}/${_net}/bitcoin"
-    done
 fi
 
 if [[ -z "${NETWORK}" ]]; then
