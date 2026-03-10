@@ -974,11 +974,12 @@ generate_compose() {
     local mempool_web_image
     mempool_web_image="$(get_docker_image mempool-web)"
 
-    # Build frontend backend host env vars
+    # Build frontend env vars: backend hosts + network enable flags
     local frontend_env=""
     for net in "${networks[@]}"; do
         local net_upper="${net^^}"
         frontend_env+="      BACKEND_${net_upper}_HTTP_HOST: \"mempool-api-${net}\""$'\n'
+        frontend_env+="      ${net_upper}_ENABLED: \"true\""$'\n'
     done
     # Trim trailing newline
     frontend_env="${frontend_env%$'\n'}"
