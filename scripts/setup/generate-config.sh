@@ -355,6 +355,7 @@ generate_bitcoin_conf() {
     # RPC gateway auth (if RPC endpoint enabled)
     local rpc_auth_gateway=""
     local rpc_whitelist_gateway=""
+    local rpc_whitelist_default=""
     local rpc_enabled
     rpc_enabled="$(get_config RPC_ENDPOINT_ENABLED false)"
 
@@ -371,6 +372,7 @@ generate_bitcoin_conf() {
             local methods
             methods="$(get_rpc_methods "${method_profile}")"
             rpc_whitelist_gateway="rpcwhitelist=${gw_user}:${methods}"
+            rpc_whitelist_default="rpcwhitelistdefault=0"
         fi
     fi
 
@@ -378,6 +380,7 @@ generate_bitcoin_conf() {
     if [[ -z "${rpc_auth_gateway}" ]]; then
         rpc_auth_gateway="# (RPC gateway not enabled)"
         rpc_whitelist_gateway="# (no whitelist — gateway not enabled)"
+        rpc_whitelist_default="# (rpcwhitelistdefault not set — all methods allowed for all users)"
     fi
 
     local txindex prune dbcache maxmempool maxconnections
@@ -405,6 +408,7 @@ generate_bitcoin_conf() {
         [RPC_AUTH_INTERNAL]="${rpc_auth_internal}"
         [RPC_AUTH_GATEWAY]="${rpc_auth_gateway}"
         [RPC_WHITELIST_GATEWAY]="${rpc_whitelist_gateway}"
+        [RPC_WHITELIST_DEFAULT]="${rpc_whitelist_default}"
         [DBCACHE]="${dbcache}"
         [MAXMEMPOOL]="${maxmempool}"
         [MAXCONNECTIONS]="${maxconnections}"
@@ -589,11 +593,14 @@ generate_nginx_conf() {
         network_api_locations="${network_api_locations%$'\n'}"
     fi
 
-    # --- Build RPC location ---
-    local rpc_location=""
+    # --- Build RPC server block ---
+    local rpc_server_block=""
     local rpc_enabled
     rpc_enabled="$(get_config RPC_ENDPOINT_ENABLED false)"
     if [[ "${rpc_enabled}" == "true" ]]; then
+        local rpc_port
+        rpc_port="$(get_config RPC_PORT 3000)"
+
         local gw_user gw_pass basic_auth
         gw_user="$(get_config GATEWAY_RPC_USER gateway)"
         gw_pass="$(get_config GATEWAY_RPC_PASS)"
@@ -639,25 +646,33 @@ generate_nginx_conf() {
             printf '%s' "${block}"
         }
 
+        rpc_server_block+="    server {"$'\n'
+        rpc_server_block+="        listen ${rpc_port};"$'\n'
+        rpc_server_block+="        server_name _;"$'\n'
+
         # Default RPC route: /rpc/v1/{key} → primary network's bitcoind
         local primary_net="${networks[0]}"
         get_chain_params "${primary_net}"
         local primary_rpc_port="${CHAIN_RPC_PORT}"
 
-        rpc_location+="$(_rpc_location_block "/rpc/v1/[^/]+" "bitcoind-${primary_net}" "${primary_rpc_port}")"
+        rpc_server_block+=$'\n'
+        rpc_server_block+="$(_rpc_location_block "/rpc/v1/[^/]+" "bitcoind-${primary_net}" "${primary_rpc_port}")"
 
         # Per-network explicit routes: /rpc/v1/{key}/{network}
         local rpc_net
         for rpc_net in "${networks[@]}"; do
             get_chain_params "${rpc_net}"
-            rpc_location+=$'\n\n'
-            rpc_location+="$(_rpc_location_block "/rpc/v1/[^/]+/${rpc_net}" "bitcoind-${rpc_net}" "${CHAIN_RPC_PORT}")"
+            rpc_server_block+=$'\n\n'
+            rpc_server_block+="$(_rpc_location_block "/rpc/v1/[^/]+/${rpc_net}" "bitcoind-${rpc_net}" "${CHAIN_RPC_PORT}")"
         done
+
+        rpc_server_block+=$'\n'
+        rpc_server_block+="    }"
 
         # Clean up the helper function
         unset -f _rpc_location_block
     else
-        rpc_location="        # (RPC gateway not enabled)"
+        rpc_server_block="    # (RPC server block not enabled)"
     fi
 
     # --- Build SSL config ---
@@ -686,7 +701,7 @@ generate_nginx_conf() {
         [SERVER_NAME]="${server_name}"
         [MAINNET_API_LOCATIONS]="${mainnet_api_locations}"
         [NETWORK_API_LOCATIONS]="${network_api_locations}"
-        [RPC_LOCATION]="${rpc_location}"
+        [RPC_SERVER_BLOCK]="${rpc_server_block}"
     )
 
     local output
@@ -856,7 +871,7 @@ generate_compose() {
         network_services+="    expose:"$'\n'
         network_services+="      - \"${CHAIN_RPC_PORT}\""$'\n'
         network_services+="    healthcheck:"$'\n'
-        network_services+="      test: [\"CMD\", \"bitcoin-cli\", \"-rpcport=${CHAIN_RPC_PORT}\", \"getblockchaininfo\"]"$'\n'
+        network_services+="      test: [\"CMD\", \"bitcoin-cli\", \"-datadir=/data/.bitcoin\", \"-rpcport=${CHAIN_RPC_PORT}\", \"getblockchaininfo\"]"$'\n'
         network_services+="      interval: 30s"$'\n'
         network_services+="      timeout: 10s"$'\n'
         network_services+="      retries: 5"$'\n'
@@ -995,6 +1010,12 @@ generate_compose() {
     if [[ "${tls_mode}" != "none" ]]; then
         openresty_ports+=$'\n'
         openresty_ports+="      - \"443:443\""
+    fi
+    if [[ "${rpc_enabled}" == "true" ]]; then
+        local rpc_port
+        rpc_port="$(get_config RPC_PORT 3000)"
+        openresty_ports+=$'\n'
+        openresty_ports+="      - \"${rpc_port}:${rpc_port}\""
     fi
 
     shared_services+="  openresty:"$'\n'
