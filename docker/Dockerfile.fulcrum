@@ -1,0 +1,37 @@
+FROM ubuntu:24.04
+
+# Build-from-source Dockerfile for Fulcrum (alternative electrum server).
+# Used only when per-network indexer choice is configured for Fulcrum.
+# The default indexer is electrs, pulled as a pre-built image from Docker Hub.
+
+ARG FULCRUM_VERSION=1.11.1
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install build dependencies (Qt6 for Ubuntu 24.04)
+RUN apt-get update && apt-get install -y \
+    build-essential git \
+    libssl-dev libzmq3-dev libbz2-dev \
+    qt6-base-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Clone, build, and install Fulcrum
+RUN git clone https://github.com/cculianu/Fulcrum.git /tmp/fulcrum \
+    && cd /tmp/fulcrum \
+    && git checkout "v${FULCRUM_VERSION}" \
+    && qmake6 Fulcrum.pro \
+    && make -j"$(nproc)" \
+    && install -m 0755 Fulcrum /usr/local/bin/ \
+    && rm -rf /tmp/fulcrum
+
+# Create fulcrum user and data directory
+RUN useradd -m -s /bin/bash -u 1000 fulcrum \
+    && mkdir -p /data \
+    && chown -R fulcrum:fulcrum /data
+
+USER fulcrum
+WORKDIR /data
+
+EXPOSE 50001 50002
+
+ENTRYPOINT ["Fulcrum"]

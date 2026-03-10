@@ -1,8 +1,0 @@
----
-description: 
-globs: 
-alwaysApply: true
----
-- document development plans, task lists, and research findings, recomendations, and changes to the project in markdown files in the .project directory
-- refer back to these files when completing new work
-- comply with the contents of this directory and do not deviate from these plans without first consulting with the developer
