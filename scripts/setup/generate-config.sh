@@ -1127,12 +1127,6 @@ generate_ufw_rules() {
         rpc_port="$(get_config RPC_PORT 3000)"
     fi
 
-    # Derive LAN subnet from bind IP (assume /24)
-    local lan_subnet=""
-    if [[ "${bind_ip}" != "127.0.0.1" ]]; then
-        lan_subnet="${bind_ip%.*}.0/24"
-    fi
-
     # --- Standard UFW rules (host-level) ---
     ufw_rules+="ufw allow ssh"$'\n'
     ufw_rules+=$'\n'
@@ -1181,42 +1175,27 @@ generate_ufw_rules() {
     docker_rules+="# Bitcoin P2P — open to all"$'\n'
     for net in "${networks[@]}"; do
         get_default_ports "${net}"
-        docker_rules+="ufw-docker allow bitcoind-${net} ${BITCOIN_P2P_PORT}/tcp"$'\n'
+        docker_rules+="ufw-docker allow bitcoind-${net} ${BITCOIN_P2P_PORT}"$'\n'
     done
     docker_rules+=$'\n'
 
-    if [[ "${tunnel_enabled}" == "true" ]]; then
-        # With tunnel: web/RPC only accessible from LAN (if bind IP is not localhost)
-        if [[ -n "${lan_subnet}" ]]; then
-            docker_rules+="# Web — LAN access only (external traffic via Cloudflare Tunnel)"$'\n'
-            docker_rules+="ufw-docker allow openresty ${web_port}/tcp ${lan_subnet}"$'\n'
-            if [[ "${tls_mode}" != "none" ]]; then
-                docker_rules+="ufw-docker allow openresty 443/tcp ${lan_subnet}"$'\n'
-            fi
-            docker_rules+=$'\n'
-
-            if [[ "${rpc_enabled}" == "true" ]] && [[ -n "${rpc_port}" ]]; then
-                docker_rules+="# RPC — LAN access only"$'\n'
-                docker_rules+="ufw-docker allow openresty ${rpc_port}/tcp ${lan_subnet}"$'\n'
-                docker_rules+=$'\n'
-            fi
-        else
-            docker_rules+="# Web/RPC bound to localhost — no ufw-docker rules needed"$'\n'
-            docker_rules+="# All external traffic flows through Cloudflare Tunnel"$'\n'
-            docker_rules+=$'\n'
-        fi
+    if [[ "${bind_ip}" == "127.0.0.1" ]]; then
+        docker_rules+="# Web/RPC bound to localhost — no ufw-docker rules needed"$'\n'
+        docker_rules+="# All external traffic flows through Cloudflare Tunnel"$'\n'
+        docker_rules+=$'\n'
     else
-        # No tunnel: web/RPC open to all
-        docker_rules+="# Web — open to all"$'\n'
-        docker_rules+="ufw-docker allow openresty ${web_port}/tcp"$'\n'
+        # Bind IP restricts access to the selected interface;
+        # ufw-docker rules allow traffic through Docker's iptables
+        docker_rules+="# Web"$'\n'
+        docker_rules+="ufw-docker allow openresty ${web_port}"$'\n'
         if [[ "${tls_mode}" != "none" ]]; then
-            docker_rules+="ufw-docker allow openresty 443/tcp"$'\n'
+            docker_rules+="ufw-docker allow openresty 443"$'\n'
         fi
         docker_rules+=$'\n'
 
         if [[ "${rpc_enabled}" == "true" ]] && [[ -n "${rpc_port}" ]]; then
-            docker_rules+="# RPC — open to all"$'\n'
-            docker_rules+="ufw-docker allow openresty ${rpc_port}/tcp"$'\n'
+            docker_rules+="# RPC"$'\n'
+            docker_rules+="ufw-docker allow openresty ${rpc_port}"$'\n'
             docker_rules+=$'\n'
         fi
     fi
