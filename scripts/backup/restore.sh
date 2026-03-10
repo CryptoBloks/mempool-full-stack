@@ -10,6 +10,22 @@
 # ==============================================================================
 set -euo pipefail
 
+# Trap handler — ensure services are restarted on failure
+_restore_cleanup() {
+    local exit_code=$?
+    if [[ ${exit_code} -ne 0 ]] && [[ -n "${NETWORK:-}" ]]; then
+        log_warn "Restore interrupted (exit ${exit_code}). Restarting services..."
+        cd "${PROJECT_ROOT}" 2>/dev/null || true
+        for svc in "bitcoind-${NETWORK}" "electrs-${NETWORK}" "mempool-api-${NETWORK}"; do
+            docker compose start "${svc}" 2>/dev/null || true
+        done
+        if printf '%s\n' "${RESTORE_COMPONENTS[@]:-}" | grep -q '^mariadb$' 2>/dev/null; then
+            docker compose start mariadb 2>/dev/null || true
+        fi
+    fi
+}
+trap _restore_cleanup EXIT
+
 _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../lib/common.sh
 source "${_SCRIPT_DIR}/../lib/common.sh"
@@ -325,3 +341,5 @@ log_success "Network:    ${NETWORK}"
 log_success "Backup ID:  ${BACKUP_ID}"
 log_success "Source:      ${SOURCE}"
 log_success "Components:  ${RESTORE_COMPONENTS[*]}"
+
+trap - EXIT

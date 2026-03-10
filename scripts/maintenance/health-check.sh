@@ -127,9 +127,9 @@ done
 log_info "Checking MariaDB connectivity..."
 
 if docker compose ps --status running --format "{{.Name}}" 2>/dev/null | grep -q "^mariadb$"; then
-    MYSQL_ROOT_PASS="$(get_config MARIADB_ROOT_PASSWORD "")"
+    MYSQL_ROOT_PASS="$(get_config MARIADB_ROOT_PASS "")"
     MYSQL_USER="$(get_config MARIADB_USER "mempool")"
-    MYSQL_PASS="$(get_config MARIADB_PASSWORD "")"
+    MYSQL_PASS="$(get_config MARIADB_PASS "")"
 
     # Try connecting with the application user
     if [[ -n "${MYSQL_PASS}" ]]; then
