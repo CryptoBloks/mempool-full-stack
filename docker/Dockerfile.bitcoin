@@ -21,12 +21,8 @@ RUN cd /tmp \
     && install -m 0755 bitcoin-${BITCOIN_VERSION}/bin/* /usr/local/bin/ \
     && rm -rf /tmp/bitcoin-* /tmp/SHA256SUMS
 
-# Create bitcoin user and data directory
-RUN useradd -m -s /bin/bash -u 10000 bitcoin \
-    && mkdir -p /data/.bitcoin \
-    && chown -R bitcoin:bitcoin /data
+RUN mkdir -p /data/.bitcoin
 
-USER bitcoin
 WORKDIR /data
 
 EXPOSE 8332 8333 18332 18333 38332 38333
