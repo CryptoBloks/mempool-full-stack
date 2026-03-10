@@ -668,7 +668,18 @@ generate_nginx_conf() {
 
         rpc_server_block+=$'\n\n'
         rpc_server_block+="        location / {"$'\n'
-        rpc_server_block+="            return 404 '{\"error\": \"Not found. Use /rpc/v1/{api-key}\"}';"$'\n'
+        rpc_server_block+="            default_type application/json;"$'\n'
+        rpc_server_block+="            set \$resp_type 'json';"$'\n'
+        rpc_server_block+="            if (\$http_accept ~* text/html) {"$'\n'
+        rpc_server_block+="                set \$resp_type 'html';"$'\n'
+        rpc_server_block+="            }"$'\n'
+        rpc_server_block+="            if (\$resp_type = 'html') {"$'\n'
+        rpc_server_block+="                add_header Content-Type text/html;"$'\n'
+        rpc_server_block+="                return 200 '<!DOCTYPE html><html><head><title>Bitcoin RPC Gateway</title><style>body{font-family:system-ui,sans-serif;max-width:600px;margin:80px auto;padding:0 20px;color:#333;background:#f8f8f8}h1{color:#f7931a}code{background:#e8e8e8;padding:2px 6px;border-radius:3px;font-size:0.9em}pre{background:#2d2d2d;color:#f8f8f2;padding:16px;border-radius:6px;overflow-x:auto}</style></head><body><h1>Bitcoin RPC Gateway</h1><p>This is a JSON-RPC endpoint. Send POST requests to:</p><pre>POST /rpc/v1/{api-key}</pre><p>Example:</p><pre>curl -X POST https://\$host/rpc/v1/{api-key} \\\\\\n  -H \"Content-Type: application/json\" \\\\\\n  -d \\'{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"getblockchaininfo\",\"params\":[]}\\'</pre></body></html>';"$'\n'
+        rpc_server_block+="            }"$'\n'
+        rpc_server_block+="            if (\$resp_type = 'json') {"$'\n'
+        rpc_server_block+="                return 404 '{\"error\": \"Not found\", \"usage\": \"POST /rpc/v1/{api-key}\", \"methods\": \"getblockchaininfo, getblock, getblockhash, ...\"}';"$'\n'
+        rpc_server_block+="            }"$'\n'
         rpc_server_block+="        }"$'\n'
         rpc_server_block+="    }"
 
