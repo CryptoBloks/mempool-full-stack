@@ -98,7 +98,7 @@ openresty → mempool-web + mempool-api-{net}
 - **Per-network containers**: `{service}-{network}` naming (e.g., `bitcoind-mainnet`)
 - **Shared containers**: `mariadb`, `mempool-web`, `openresty`, `cloudflared` (no suffix)
 - **Storage layout**: `${STORAGE_PATH}/{network}/{service}/` (default `/data/mempool`)
-- **RPC routing**: `/rpc/v1/{key}[/{network}]` with path-based + header (`X-API-Key`) auth
+- **RPC routing**: `/v1/{key}[/{network}]` with path-based + header (`X-API-Key`) auth
 - **Backup streaming**: `tar | zstd -T0 -3 | rclone rcat` (no temp files)
 - **BTRFS snapshots**: Read-only snapshots for atomic backup; non-BTRFS fallback with warning
 - **MariaDB init**: `CREATE DATABASE IF NOT EXISTS` in generated SQL; `start.sh` applies idempotently on every start

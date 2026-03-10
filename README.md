@@ -113,18 +113,18 @@ When `RPC_ENDPOINT_ENABLED=true`, OpenResty exposes a Bitcoin JSON-RPC endpoint 
 ./scripts/rpc/add-key.sh --name "my-app" --rate-limit 120
 
 # Make a request (path-based auth)
-curl -X POST http://your-server:3000/rpc/v1/YOUR_API_KEY \
+curl -X POST http://your-server:3000/v1/YOUR_API_KEY \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"getblockchaininfo","params":[]}'
 
 # Or use header-based auth
-curl -X POST http://your-server:3000/rpc/v1/default \
+curl -X POST http://your-server:3000/v1/default \
   -H "Content-Type: application/json" \
   -H "X-API-Key: YOUR_API_KEY" \
   -d '{"jsonrpc":"2.0","id":1,"method":"getblockcount","params":[]}'
 
 # Per-network routing
-curl -X POST http://your-server:3000/rpc/v1/YOUR_API_KEY/signet ...
+curl -X POST http://your-server:3000/v1/YOUR_API_KEY/signet ...
 
 # Manage keys
 ./scripts/rpc/list-keys.sh

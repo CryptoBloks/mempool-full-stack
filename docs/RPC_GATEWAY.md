@@ -7,8 +7,8 @@ The RPC gateway exposes your Bitcoin Core JSON-RPC interface over HTTP(S) with A
 When enabled (`RPC_ENDPOINT_ENABLED=true` in `node.conf`), the gateway accepts requests at:
 
 ```
-POST /rpc/v1/{api-key}[/{network}]
-POST /rpc/v1/ + X-API-Key header
+POST /v1/{api-key}[/{network}]
+POST /v1/ + X-API-Key header
 ```
 
 ### Defense in Depth
@@ -157,7 +157,7 @@ Disabled keys return a `403 Forbidden` response. Deleted keys return `403 Invali
 **Path-based** (key in URL):
 
 ```bash
-curl -X POST http://your-server:3000/rpc/v1/mk_live_YOUR_KEY \
+curl -X POST http://your-server:3000/v1/mk_live_YOUR_KEY \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"getblockchaininfo","params":[]}'
 ```
@@ -165,7 +165,7 @@ curl -X POST http://your-server:3000/rpc/v1/mk_live_YOUR_KEY \
 **Header-based** (key in `X-API-Key`):
 
 ```bash
-curl -X POST http://your-server:3000/rpc/v1/default \
+curl -X POST http://your-server:3000/v1/default \
   -H "Content-Type: application/json" \
   -H "X-API-Key: mk_live_YOUR_KEY" \
   -d '{"jsonrpc":"2.0","id":1,"method":"getblockchaininfo","params":[]}'
@@ -177,15 +177,15 @@ Append the network name to route to a specific Bitcoin Core instance:
 
 ```bash
 # Mainnet (default when no network specified)
-curl -X POST http://your-server:3000/rpc/v1/YOUR_KEY/mainnet \
+curl -X POST http://your-server:3000/v1/YOUR_KEY/mainnet \
   -d '{"jsonrpc":"2.0","id":1,"method":"getblockcount","params":[]}'
 
 # Signet
-curl -X POST http://your-server:3000/rpc/v1/YOUR_KEY/signet \
+curl -X POST http://your-server:3000/v1/YOUR_KEY/signet \
   -d '{"jsonrpc":"2.0","id":1,"method":"getblockcount","params":[]}'
 
 # Testnet
-curl -X POST http://your-server:3000/rpc/v1/YOUR_KEY/testnet \
+curl -X POST http://your-server:3000/v1/YOUR_KEY/testnet \
   -d '{"jsonrpc":"2.0","id":1,"method":"getblockcount","params":[]}'
 ```
 

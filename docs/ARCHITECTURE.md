@@ -57,7 +57,7 @@ The official mempool.space site uses a single frontend that routes to multiple b
                         │   /testnet/    → testnet API
                         │   /api/v1/     → mainnet API
                         │   /signet/api/ → signet API
-                        │   /rpc/v1/     → RPC gateway (optional)
+                        │   /v1/     → RPC gateway (optional)
                         └────────┬──────────────┘
                                  │ internal docker network
           ┌──────────────────────┼──────────────────────┐
@@ -229,8 +229,8 @@ Internet
 ### Endpoint Formats
 
 Both are supported:
-- **Path-based:** `POST /rpc/v1/{api-key}[/{network}]`
-- **Header-based:** `POST /rpc/v1/ + X-API-Key: {key}`
+- **Path-based:** `POST /v1/{api-key}[/{network}]`
+- **Header-based:** `POST /v1/ + X-API-Key: {key}`
 
 ### Method Whitelist Profiles
 
