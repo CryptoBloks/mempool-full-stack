@@ -2,76 +2,124 @@
 
 ## Project Overview
 
-Mempool.space Docker Full Stack: a Docker Compose setup running Bitcoin Core, Fulcrum (Electrum server), MariaDB, and the Mempool.space frontend/backend. All services run on a custom bridge network (`bitcoin_network`, subnet `172.16.0.0/16`) with static IP assignments.
-
-## Technical Requirements
-
-- All Docker containers MUST be based on **Ubuntu 24.04 LTS**. Use Ubuntu 22.04 LTS only if 24.04 is not supported by a specific application.
-- Document development plans, task lists, research findings, recommendations, and changes in this file or linked markdown files.
-- Refer back to this file when completing new work.
-- Do not deviate from documented plans without consulting the developer.
+Mempool.space Docker Full Stack: a configurator-driven, self-hosted Bitcoin infrastructure platform. An interactive wizard generates `node.conf`, which drives template-based config generation for all services. Supports multi-network (mainnet, signet, testnet) with per-network containers, an optional RPC gateway, BTRFS snapshot backups, and Cloudflare Tunnel integration.
 
 ## Architecture
 
-### Services & Static IPs
+### Configuration Flow
 
-| Service      | Container        | IP           | Ports (external) | Ports (internal)  |
-|-------------|-----------------|-------------|-----------------|------------------|
-| Bitcoin Core | `bitcoin-core`   | `172.16.0.2` | 8333 (P2P)       | 8332 (RPC)        |
-| Fulcrum      | `fulcrum`        | `172.16.0.3` | —                | 50001, 50002      |
-| MariaDB      | `mariadb`        | `172.16.0.4` | —                | 3306              |
-| Mempool      | `mempool`        | `172.16.0.5` | 80 (web)          | —                 |
+```
+wizard.sh → node.conf → generate-config.sh → all config files + docker-compose.yml
+```
+
+- **node.conf**: Single source of truth (KEY=VALUE format, gitignored)
+- **Templates**: `config/templates/*.tmpl` with `{{PLACEHOLDER}}` syntax
+- **Generator**: Reads node.conf, renders templates, writes config files
+- **Validator**: Checks node.conf keys + all generated files (52+ checks)
+
+### Container Layout
+
+Per-network (one set per enabled network):
+
+| Service | Container | Ports (internal) |
+|---------|-----------|-----------------|
+| Bitcoin Core | `bitcoind-{network}` | RPC (8332/38332/18332), P2P (8333/38333/18333) |
+| Electrs | `electrs-{network}` | 50001 |
+| Mempool API | `mempool-api-{network}` | 8999 |
+
+Shared:
+
+| Service | Container | Ports |
+|---------|-----------|-------|
+| MariaDB | `mariadb` | 3306 (internal) |
+| Mempool Frontend | `mempool-web` | 8080 (internal) |
+| OpenResty | `openresty` | 80/443 (external), RPC port (external, optional) |
+| Cloudflare Tunnel | `cloudflared` | none (outbound only, optional) |
+
+### Network
+
+- Bridge: `mempool_net` (172.20.0.0/24)
+- Only P2P ports and web/RPC ports are exposed externally
+- All inter-service communication stays on the bridge
 
 ### Dependency Chain
 
 ```
-Bitcoin Core → Fulcrum → MariaDB → Mempool
+bitcoind-{net} → electrs-{net} → mempool-api-{net}
+                                      ↓
+                                   mariadb (shared, service_healthy)
+openresty → mempool-web + mempool-api-{net}
 ```
 
-Each service waits for its upstream dependency to pass health checks before starting.
+### Default Versions
 
-### Software Versions
-
-- Bitcoin Core: 25.0
-- Fulcrum: 1.9.0
-- MariaDB: 10.6
-- Mempool: 2.3.0
-- Node.js: 20.x
+| Component | Version | Image |
+|-----------|---------|-------|
+| Bitcoin Core | 28.1 | mempool/bitcoin:28.1 |
+| Mempool | 3.1.0 | mempool/backend:v3.1.0, mempool/frontend:v3.1.0 |
+| Electrs | latest | mempool/electrs:latest |
+| MariaDB | 10.11 | mariadb:10.11 |
+| OpenResty | alpine | openresty/openresty:alpine |
 
 ## File Structure
 
 ```
 .
+├── scripts/
+│   ├── setup/
+│   │   ├── wizard.sh              # Interactive configurator (11 sections)
+│   │   ├── generate-config.sh     # Template renderer (core generator)
+│   │   └── validate-config.sh     # End-to-end validator
+│   ├── lib/
+│   │   ├── common.sh              # Logging, prompts, validators, generate_password
+│   │   ├── config-utils.sh        # load_config, get_config, set_config, get_networks
+│   │   └── network-defaults.sh    # Per-network ports, chain params, docker images
+│   ├── node/                      # start, stop, restart, status, logs
+│   ├── rpc/                       # add-key, list-keys, revoke-key, test-endpoint
+│   ├── backup/                    # full-backup, restore, s3-push/pull/list/prune
+│   ├── snapshot/                  # create, list, prune
+│   ├── ssl/                       # generate-self-signed, setup-letsencrypt
+│   ├── tunnel/                    # setup-tunnel
+│   └── maintenance/               # health-check, update
 ├── config/
-│   ├── bitcoin/bitcoin.conf
-│   ├── fulcrum/fulcrum.conf, fulcrum.key, fulcrum.cert
-│   ├── mempool/mempool-config.json
-│   └── mariadb/init/01-init.sql, my.cnf
-├── data/                    # gitignored — runtime data volumes
-├── Dockerfile.bitcoin
-├── Dockerfile.fulcrum
-├── Dockerfile.mariadb
-├── Dockerfile.mempool
-├── docker-compose.yml
-├── setup.sh                 # creates dirs, generates SSL certs, validates .env
-├── build.sh                 # builds images and runs health checks
-├── .env.example
+│   └── templates/                 # 9 .tmpl files (only tracked files in config/)
+├── docker/
+│   ├── Dockerfile.bitcoin         # Build-from-source (ARG BITCOIN_VERSION)
+│   └── Dockerfile.fulcrum         # Build-from-source (ARG FULCRUM_VERSION)
+├── node.conf                      # Generated by wizard (gitignored)
+├── docker-compose.yml             # Generated by generate-config.sh (gitignored)
 └── README.md
 ```
 
+## Key Patterns
+
+- **Template syntax**: `{{PLACEHOLDER}}` — single-line via bash parameter expansion, multi-line via awk
+- **node.conf format**: `KEY=VALUE` (no spaces around `=`), `#` for comments
+- **Per-network containers**: `{service}-{network}` naming (e.g., `bitcoind-mainnet`)
+- **Shared containers**: `mariadb`, `mempool-web`, `openresty`, `cloudflared` (no suffix)
+- **Storage layout**: `${STORAGE_PATH}/{network}/{service}/` (default `/data/mempool`)
+- **RPC routing**: `/rpc/v1/{key}[/{network}]` with path-based + header (`X-API-Key`) auth
+- **Backup streaming**: `tar | zstd -T0 -3 | rclone rcat` (no temp files)
+- **BTRFS snapshots**: Read-only snapshots for atomic backup; non-BTRFS fallback with warning
+- **MariaDB init**: `CREATE DATABASE IF NOT EXISTS` in generated SQL; `start.sh` applies idempotently on every start
+
 ## Security Constraints
 
-- Only ports **80** (Mempool web) and **8333** (Bitcoin P2P) may be exposed externally.
-- RPC, Electrum, and MariaDB ports MUST remain internal-only.
-- All containers MUST enforce `no-new-privileges: true` and drop all capabilities except `NET_BIND_SERVICE`.
-- Credentials live in `.env` — never commit this file.
-- Fulcrum SSL certs are auto-generated by `setup.sh` (RSA 4096, 365-day validity, key `600`, cert `644`).
-- Data volume permissions: `1000:1000` for services, `999:999` for MariaDB.
+- All containers enforce `no-new-privileges: true` and drop all capabilities
+- Only Bitcoin P2P ports and web/RPC ports exposed externally
+- RPC, Electrs, and MariaDB ports are internal-only (Docker bridge)
+- When Cloudflare Tunnel is enabled, web/RPC ports are NOT opened in the firewall
+- Docker-aware UFW rules use the DOCKER-USER iptables chain to prevent bypass
+- Credentials auto-generated by the wizard, stored in `node.conf` (gitignored)
+- All config files mounted into containers as read-only (`:ro`)
+- All persistent data externalized to host volumes under `${STORAGE_PATH}/`
+- Volume permissions: `1000:1000` for bitcoin/electrs/mempool, `999:999` for MariaDB
 
 ## Development Guidelines
 
-- Always backup data before updates or destructive operations.
-- Test updates in staging when possible.
-- When updating services, follow the dependency chain order: Bitcoin Core → Fulcrum → MariaDB → Mempool.
-- Keep all containers on Ubuntu 24.04 LTS unless a specific app requires 22.04.
-- Monitor logs after any service restart or update.
+- Run `./scripts/setup/validate-config.sh` after any config changes
+- The wizard supports re-running with an existing `node.conf` (pre-fills defaults)
+- `--non-interactive` mode on the wizard uses sensible defaults for CI/testing
+- Always test the full pipeline: wizard → generate → validate before committing
+- Keep templates in `config/templates/` — generated files are gitignored
+- The `docker/` Dockerfiles are for build-from-source mode only; default mode uses Docker Hub images
