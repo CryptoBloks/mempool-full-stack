@@ -132,4 +132,4 @@ if [[ -n "${PROFILE}" ]]; then
     echo "  Profile:    ${PROFILE}"
 fi
 echo ""
-log_info "Use this key in the X-API-Key header or in the URL path: /rpc/v1/${NEW_KEY}"
+log_info "Use this key in the X-API-Key header or in the URL path: /v1/${NEW_KEY}"

@@ -367,7 +367,7 @@ assert_file_contains "nginx.conf: proxy_pass to mempool-api-mainnet" \
     "proxy_pass http://mempool-api-mainnet"
 assert_file_not_contains "nginx.conf: no RPC location when RPC disabled" \
     "${WORK_DIR}/config/openresty/nginx.conf" \
-    "location ~ \^/rpc/v1/"
+    "location ~ \^/v1/"
 assert_file_contains "nginx.conf: server_name _" \
     "${WORK_DIR}/config/openresty/nginx.conf" \
     "server_name _"
@@ -556,9 +556,9 @@ assert_file_contains "jsonrpc-access.lua: whitelisted_methods table" \
 echo ""
 echo "  --- nginx.conf RPC checks ---"
 
-assert_file_contains "nginx.conf: RPC location block /rpc/v1/" \
+assert_file_contains "nginx.conf: RPC location block /v1/" \
     "${WORK_DIR}/config/openresty/nginx.conf" \
-    "/rpc/v1/"
+    "/v1/"
 
 echo ""
 echo "  --- bitcoin.conf RPC gateway checks (mainnet) ---"

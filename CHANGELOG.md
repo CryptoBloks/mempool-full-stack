@@ -42,7 +42,7 @@ Complete rewrite from a static Docker Compose stack into a configurator-driven, 
 
 **Phase 4: RPC Gateway** (`760e45d`)
 - Lua-based JSON-RPC filtering with `lua-resty-limit-req` rate limiting
-- Path-based API key support (`/rpc/v1/{key}[/{network}]`)
+- Path-based API key support (`/v1/{key}[/{network}]`)
 - Header-based API key support (`X-API-Key`)
 - Per-network RPC routing (mainnet/signet/testnet)
 - Method whitelist profiles (read-only / standard / full)

@@ -654,20 +654,20 @@ generate_nginx_conf() {
         rpc_server_block+="        # Docker embedded DNS (required for variable-based proxy_pass)"$'\n'
         rpc_server_block+="        resolver 127.0.0.11 valid=30s;"$'\n'
 
-        # Default RPC route: /rpc/v1/{key} → primary network's bitcoind
+        # Default RPC route: /v1/{key} → primary network's bitcoind
         local primary_net="${networks[0]}"
         get_chain_params "${primary_net}"
         local primary_rpc_port="${CHAIN_RPC_PORT}"
 
         rpc_server_block+=$'\n'
-        rpc_server_block+="$(_rpc_location_block "/rpc/v1/[^/]+" "bitcoind-${primary_net}" "${primary_rpc_port}")"
+        rpc_server_block+="$(_rpc_location_block "/v1/[^/]+" "bitcoind-${primary_net}" "${primary_rpc_port}")"
 
-        # Per-network explicit routes: /rpc/v1/{key}/{network}
+        # Per-network explicit routes: /v1/{key}/{network}
         local rpc_net
         for rpc_net in "${networks[@]}"; do
             get_chain_params "${rpc_net}"
             rpc_server_block+=$'\n\n'
-            rpc_server_block+="$(_rpc_location_block "/rpc/v1/[^/]+/${rpc_net}" "bitcoind-${rpc_net}" "${CHAIN_RPC_PORT}")"
+            rpc_server_block+="$(_rpc_location_block "/v1/[^/]+/${rpc_net}" "bitcoind-${rpc_net}" "${CHAIN_RPC_PORT}")"
         done
 
         rpc_server_block+=$'\n\n'
@@ -685,9 +685,9 @@ generate_nginx_conf() {
         rpc_server_block+="</style></head><body>"$'\n'
         rpc_server_block+="<h1>Bitcoin RPC Gateway</h1>"$'\n'
         rpc_server_block+="<p>This is a JSON-RPC endpoint. Send POST requests to:</p>"$'\n'
-        rpc_server_block+="<pre>POST /rpc/v1/{api-key}</pre>"$'\n'
+        rpc_server_block+="<pre>POST /v1/{api-key}</pre>"$'\n'
         rpc_server_block+="<p>Example:</p>"$'\n'
-        rpc_server_block+="<pre>curl -X POST https://host/rpc/v1/{api-key} \\"$'\n'
+        rpc_server_block+="<pre>curl -X POST https://host/v1/{api-key} \\"$'\n'
         rpc_server_block+="  -H \"Content-Type: application/json\" \\"$'\n'
         rpc_server_block+="  -d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"getblockchaininfo\",\"params\":[]}'</pre>"$'\n'
         rpc_server_block+="</body></html>"$'\n'
@@ -695,7 +695,7 @@ generate_nginx_conf() {
         rpc_server_block+="                else"$'\n'
         rpc_server_block+="                    ngx.header[\"Content-Type\"] = \"application/json\""$'\n'
         rpc_server_block+="                    ngx.status = 404"$'\n'
-        rpc_server_block+="                    ngx.say('{\"error\":\"Not found\",\"usage\":\"POST /rpc/v1/{api-key}\"}')"$'\n'
+        rpc_server_block+="                    ngx.say('{\"error\":\"Not found\",\"usage\":\"POST /v1/{api-key}\"}')"$'\n'
         rpc_server_block+="                end"$'\n'
         rpc_server_block+="            }"$'\n'
         rpc_server_block+="        }"$'\n'
