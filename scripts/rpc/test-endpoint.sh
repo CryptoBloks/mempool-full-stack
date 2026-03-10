@@ -118,18 +118,10 @@ if [[ -z "${API_KEY}" ]]; then
 fi
 
 # Build URL
-if [[ "${USE_HEADER}" == "true" ]]; then
-    if [[ -n "${NETWORK}" ]]; then
-        URL="http://${HOST}:${PORT}/rpc/v1/default/${NETWORK}"
-    else
-        URL="http://${HOST}:${PORT}/rpc/v1/default"
-    fi
+if [[ -n "${NETWORK}" ]]; then
+    URL="http://${HOST}:${PORT}/rpc/v1/${API_KEY}/${NETWORK}"
 else
-    if [[ -n "${NETWORK}" ]]; then
-        URL="http://${HOST}:${PORT}/rpc/v1/${API_KEY}/${NETWORK}"
-    else
-        URL="http://${HOST}:${PORT}/rpc/v1/${API_KEY}"
-    fi
+    URL="http://${HOST}:${PORT}/rpc/v1/${API_KEY}"
 fi
 
 # Build JSON-RPC payload

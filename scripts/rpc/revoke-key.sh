@@ -112,7 +112,7 @@ else
 fi
 
 # Reload OpenResty if running
-if docker ps --format '{{.Names}}' 2>/dev/null | grep -q 'openresty'; then
+if docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^openresty$'; then
     log_info "Reloading OpenResty..."
     if docker exec openresty nginx -s reload 2>/dev/null; then
         log_success "OpenResty reloaded successfully."
