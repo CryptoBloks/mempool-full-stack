@@ -666,7 +666,10 @@ generate_nginx_conf() {
             rpc_server_block+="$(_rpc_location_block "/rpc/v1/[^/]+/${rpc_net}" "bitcoind-${rpc_net}" "${CHAIN_RPC_PORT}")"
         done
 
-        rpc_server_block+=$'\n'
+        rpc_server_block+=$'\n\n'
+        rpc_server_block+="        location / {"$'\n'
+        rpc_server_block+="            return 404 '{\"error\": \"Not found. Use /rpc/v1/{api-key}\"}';"$'\n'
+        rpc_server_block+="        }"$'\n'
         rpc_server_block+="    }"
 
         # Clean up the helper function
