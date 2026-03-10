@@ -1,4 +1,4 @@
-# Mempool.space Full Stack Docker
+# Mempool.space Full Stack - On Docker
 
 A configurator-driven, self-hosted Bitcoin infrastructure platform. Deploy a complete mempool.space block explorer with multi-network support, an optional RPC gateway, and full backup/restore — all driven by a single interactive wizard.
 
