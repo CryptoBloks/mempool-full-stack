@@ -404,7 +404,7 @@ generate_bitcoin_conf() {
         [PRUNE]="${prune}"
         [RPC_PORT]="${CHAIN_RPC_PORT}"
         [RPC_BIND]="0.0.0.0"
-        [RPC_ALLOWIP]="172.20.0.0/24"
+        [RPC_ALLOWIP]="172.16.0.0/12"
         [RPC_AUTH_INTERNAL]="${rpc_auth_internal}"
         [RPC_AUTH_GATEWAY]="${rpc_auth_gateway}"
         [RPC_WHITELIST_GATEWAY]="${rpc_whitelist_gateway}"
