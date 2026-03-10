@@ -941,6 +941,7 @@ generate_compose() {
         network_services+="      - /data"$'\n'
         network_services+="      - --cookie"$'\n'
         network_services+="      - ${rpc_user}:${rpc_pass}"$'\n'
+        network_services+="      - --jsonrpc-import"$'\n'
         network_services+="    depends_on:"$'\n'
         network_services+="      bitcoind-${net}:"$'\n'
         network_services+="        condition: service_healthy"$'\n'
