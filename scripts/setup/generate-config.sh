@@ -921,15 +921,34 @@ generate_compose() {
         network_services+=$'\n'
 
         # --- electrs ---
+        local electrs_network
+        electrs_network="$(get_electrs_network "${net}")"
+        local rpc_user rpc_pass
+        rpc_user="$(get_config BITCOIN_RPC_USER)"
+        rpc_pass="$(get_config BITCOIN_RPC_PASS)"
+
         network_services+="  electrs-${net}:"$'\n'
         network_services+="    image: ${electrs_image}"$'\n'
         network_services+="    container_name: electrs-${net}"$'\n'
+        network_services+="    command:"$'\n'
+        network_services+="      - /bin/electrs"$'\n'
+        network_services+="      - --network"$'\n'
+        network_services+="      - ${electrs_network}"$'\n'
+        network_services+="      - --daemon-rpc-addr"$'\n'
+        network_services+="      - bitcoind-${net}:${CHAIN_RPC_PORT}"$'\n'
+        network_services+="      - --daemon-p2p-addr"$'\n'
+        network_services+="      - bitcoind-${net}:${CHAIN_P2P_PORT}"$'\n'
+        network_services+="      - --electrum-rpc-addr"$'\n'
+        network_services+="      - 0.0.0.0:50001"$'\n'
+        network_services+="      - --db-dir"$'\n'
+        network_services+="      - /data"$'\n'
+        network_services+="      - --cookie"$'\n'
+        network_services+="      - ${rpc_user}:${rpc_pass}"$'\n'
         network_services+="    depends_on:"$'\n'
         network_services+="      bitcoind-${net}:"$'\n'
         network_services+="        condition: service_healthy"$'\n'
         network_services+="    volumes:"$'\n'
         network_services+="      - ${storage_path}/${net}/electrs:/data"$'\n'
-        network_services+="      - ./config/${net}/electrs.toml:/etc/electrs/config.toml:ro"$'\n'
         network_services+="    expose:"$'\n'
         network_services+="      - \"50001\""$'\n'
         network_services+="    networks:"$'\n'
