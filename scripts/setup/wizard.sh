@@ -201,47 +201,10 @@ section_networks() {
 section_bitcoin_source() {
     log_header "2/11 — Bitcoin Core Source"
 
-    local existing
-    existing="$(wiz_default BITCOIN_MODE "docker-image")"
-
-    if ${NON_INTERACTIVE}; then
-        log_info "Bitcoin mode: ${existing}"
-        wiz_set BITCOIN_MODE "${existing}"
-        return
-    fi
-
-    local -a options=(
-        "docker-image   Use official Docker image (recommended)"
-        "build          Build from source (Ubuntu 24.04)"
-        "external       Connect to an existing Bitcoin Core node"
-    )
-
-    local default_idx=1
-    case "${existing}" in
-        build) default_idx=2 ;;
-        external) default_idx=3 ;;
-    esac
-
-    local choice
-    choice="$(ask_choice "Bitcoin Core deployment mode:" options "${default_idx}")"
-    local mode="${choice%% *}"  # extract first word before spaces
-
-    wiz_set BITCOIN_MODE "${mode}"
-
-    if [[ "${mode}" == "external" ]]; then
-        local ext_host ext_port ext_user ext_pass
-        ext_host="$(ask_input "Bitcoin Core RPC host" "$(wiz_default BITCOIN_EXT_RPC_HOST "127.0.0.1")")"
-        ext_port="$(ask_input "Bitcoin Core RPC port" "$(wiz_default BITCOIN_EXT_RPC_PORT "8332")")"
-        ext_user="$(ask_input "Bitcoin Core RPC user" "$(wiz_default BITCOIN_EXT_RPC_USER "")")"
-        ext_pass="$(ask_secret "Bitcoin Core RPC password")"
-
-        wiz_set BITCOIN_EXT_RPC_HOST "${ext_host}"
-        wiz_set BITCOIN_EXT_RPC_PORT "${ext_port}"
-        wiz_set BITCOIN_EXT_RPC_USER "${ext_user}"
-        wiz_set BITCOIN_EXT_RPC_PASS "${ext_pass}"
-    fi
-
-    log_success "Bitcoin Core mode: ${mode}"
+    # Only docker-image mode is currently supported.
+    # Build-from-source and external Bitcoin Core will be added in a future release.
+    wiz_set BITCOIN_MODE "docker-image"
+    log_info "Bitcoin Core mode: docker-image (official Docker images)"
 }
 
 # ==============================================================================
@@ -522,18 +485,9 @@ section_rpc_endpoint() {
             log_warn "Some RPC methods may not work without txindex."
         fi
 
-        # Auth mode
-        local -a auth_modes=("api-key" "bearer" "basic")
-        local auth_default=1
-        local existing_auth
-        existing_auth="$(wiz_default RPC_AUTH_MODE "api-key")"
-        case "${existing_auth}" in
-            bearer) auth_default=2 ;;
-            basic) auth_default=3 ;;
-        esac
-        local auth_choice
-        auth_choice="$(ask_choice "RPC authentication mode:" auth_modes "${auth_default}")"
-        wiz_set RPC_AUTH_MODE "${auth_choice}"
+        # Only api-key auth mode is currently implemented
+        wiz_set RPC_AUTH_MODE "api-key"
+        log_info "Auth mode: api-key (path-based and X-API-Key header)"
 
         # API key generation
         local existing_key
@@ -592,7 +546,7 @@ section_rpc_endpoint() {
             wiz_set GATEWAY_RPC_PASS "$(generate_password 32)"
         fi
 
-        log_success "RPC endpoint enabled: ${auth_choice} auth, ${prof_choice} profile, port ${rpc_port}"
+        log_success "RPC endpoint enabled: api-key auth, ${prof_choice} profile, port ${rpc_port}"
     else
         wiz_set RPC_ENDPOINT_ENABLED "false"
         log_info "RPC endpoint disabled."

@@ -33,9 +33,6 @@ http {
         # Additional network APIs (signet, testnet)
 {{NETWORK_API_LOCATIONS}}
 
-        # RPC Gateway (if enabled)
-{{RPC_LOCATION}}
-
         # Frontend
         location / {
             proxy_pass http://mempool-web;
@@ -45,4 +42,6 @@ http {
             proxy_set_header X-Forwarded-Proto $scheme;
         }
     }
+
+{{RPC_SERVER_BLOCK}}
 }

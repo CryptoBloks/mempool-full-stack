@@ -85,7 +85,7 @@ assert_file_not_exists() {
 assert_file_contains() {
     local label="$1" filepath="$2" pattern="$3"
     ((TOTAL++)) || true
-    if grep -qE "${pattern}" "${filepath}" 2>/dev/null; then
+    if grep -qE -- "${pattern}" "${filepath}" 2>/dev/null; then
         ((PASS++)) || true
         printf '  \033[0;32m✓\033[0m %s\n' "${label}"
     else
@@ -97,7 +97,7 @@ assert_file_contains() {
 assert_file_not_contains() {
     local label="$1" filepath="$2" pattern="$3"
     ((TOTAL++)) || true
-    if ! grep -qE "${pattern}" "${filepath}" 2>/dev/null; then
+    if ! grep -qE -- "${pattern}" "${filepath}" 2>/dev/null; then
         ((PASS++)) || true
         printf '  \033[0;32m✓\033[0m %s\n' "${label}"
     else
