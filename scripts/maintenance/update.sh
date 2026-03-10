@@ -177,19 +177,32 @@ fi
 # Pull new images
 log_info "Pulling new Docker images..."
 if ! docker compose pull; then
-    log_error "Image pull failed. Rolling back node.conf."
-    if [[ -n "${BACKUP_CONF}" ]]; then
+    log_error "Image pull failed. Rolling back..."
+    if [[ -n "${BACKUP_CONF}" && -f "${BACKUP_CONF}" ]]; then
         mv -f "${BACKUP_CONF}" "${PROJECT_ROOT}/node.conf"
+        if [[ -x "${PROJECT_ROOT}/scripts/setup/generate-config.sh" ]]; then
+            log_info "Regenerating configs from rolled-back node.conf..."
+            "${PROJECT_ROOT}/scripts/setup/generate-config.sh" || true
+        fi
     fi
     exit 1
 fi
 
-# Clean up backup on success path
-[[ -n "${BACKUP_CONF}" && -f "${BACKUP_CONF}" ]] && rm -f "${BACKUP_CONF}"
-
 # Recreate containers with new images
 log_info "Recreating containers..."
-docker compose up -d
+if ! docker compose up -d; then
+    log_error "Container recreation failed. Rolling back..."
+    if [[ -n "${BACKUP_CONF}" && -f "${BACKUP_CONF}" ]]; then
+        mv -f "${BACKUP_CONF}" "${PROJECT_ROOT}/node.conf"
+        if [[ -x "${PROJECT_ROOT}/scripts/setup/generate-config.sh" ]]; then
+            "${PROJECT_ROOT}/scripts/setup/generate-config.sh" || true
+        fi
+    fi
+    exit 1
+fi
+
+# Clean up backup after successful deployment
+[[ -n "${BACKUP_CONF}" && -f "${BACKUP_CONF}" ]] && rm -f "${BACKUP_CONF}"
 
 log_header "Update Complete"
 log_success "Stack has been updated and restarted."

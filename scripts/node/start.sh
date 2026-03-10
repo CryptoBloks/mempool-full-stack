@@ -92,8 +92,17 @@ if [[ -z "${NETWORK}" ]]; then
     # were added after initial setup, this ensures the new databases are created.
     init_sql="${PROJECT_ROOT}/config/mariadb/init/01-init.sql"
     if [[ -f "${init_sql}" ]]; then
+        log_info "Waiting for MariaDB to be ready..."
+        for i in {1..30}; do
+            if docker compose exec -T mariadb mariadb -u root -p"$(get_config MARIADB_ROOT_PASS)" -e "SELECT 1" &>/dev/null; then
+                break
+            fi
+            sleep 1
+        done
         log_info "Ensuring MariaDB databases exist..."
-        docker compose exec -T mariadb mariadb -u root -p"$(get_config MARIADB_ROOT_PASS)" < "${init_sql}" 2>/dev/null || true
+        if ! docker compose exec -T mariadb mariadb -u root -p"$(get_config MARIADB_ROOT_PASS)" < "${init_sql}"; then
+            log_warn "MariaDB init SQL failed. Databases may need manual creation."
+        fi
     fi
 
     log_success "All services started."
@@ -118,8 +127,17 @@ else
     # Ensure databases exist (in case this network was added after initial setup)
     init_sql="${PROJECT_ROOT}/config/mariadb/init/01-init.sql"
     if [[ -f "${init_sql}" ]]; then
+        log_info "Waiting for MariaDB to be ready..."
+        for i in {1..30}; do
+            if docker compose exec -T mariadb mariadb -u root -p"$(get_config MARIADB_ROOT_PASS)" -e "SELECT 1" &>/dev/null; then
+                break
+            fi
+            sleep 1
+        done
         log_info "Ensuring MariaDB databases exist..."
-        docker compose exec -T mariadb mariadb -u root -p"$(get_config MARIADB_ROOT_PASS)" < "${init_sql}" 2>/dev/null || true
+        if ! docker compose exec -T mariadb mariadb -u root -p"$(get_config MARIADB_ROOT_PASS)" < "${init_sql}"; then
+            log_warn "MariaDB init SQL failed. Databases may need manual creation."
+        fi
     fi
 
     # Start network services

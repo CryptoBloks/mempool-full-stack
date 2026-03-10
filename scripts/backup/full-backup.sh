@@ -20,6 +20,28 @@
 # ==============================================================================
 set -euo pipefail
 
+# Trap handler — ensure services are restarted on failure
+_backup_cleanup() {
+    local exit_code=$?
+    if [[ ${exit_code} -ne 0 ]] && [[ -n "${NETWORK:-}" ]]; then
+        log_warn "Backup interrupted (exit ${exit_code}). Restarting ${NETWORK} services..."
+        cd "${PROJECT_ROOT}" 2>/dev/null || true
+        for svc in "bitcoind-${NETWORK}" "electrs-${NETWORK}" "mempool-api-${NETWORK}"; do
+            docker compose start "${svc}" 2>/dev/null || true
+        done
+        # Clean up any orphaned snapshots
+        if [[ -n "${SNAP_PATHS+x}" ]]; then
+            for comp in "${!SNAP_PATHS[@]}"; do
+                snap_path="${SNAP_PATHS[${comp}]}"
+                if [[ -d "${snap_path}" ]]; then
+                    btrfs subvolume delete "${snap_path}" 2>/dev/null || rm -rf "${snap_path}" 2>/dev/null || true
+                fi
+            done
+        fi
+    fi
+}
+trap _backup_cleanup EXIT
+
 _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../lib/common.sh
 source "${_SCRIPT_DIR}/../lib/common.sh"
@@ -182,7 +204,11 @@ if [[ "${USE_BTRFS}" == "true" ]]; then
 
     for comp in "${!BACKUP_SOURCES[@]}"; do
         src="${BACKUP_SOURCES[${comp}]}"
-        snap_name="${comp}-${NETWORK}-${BACKUP_ID}"
+        if [[ "${comp}" == "mariadb" ]]; then
+            snap_name="${comp}-${BACKUP_ID}"
+        else
+            snap_name="${comp}-${NETWORK}-${BACKUP_ID}"
+        fi
         snap_path="${SNAPSHOT_DIR}/${snap_name}"
 
         if btrfs subvolume snapshot -r "${src}" "${snap_path}"; then
@@ -190,10 +216,6 @@ if [[ "${USE_BTRFS}" == "true" ]]; then
             log_success "Snapshot: ${snap_name}"
         else
             log_error "Failed to snapshot ${comp}. Aborting."
-            # Restart services before exiting
-            for svc in "bitcoind-${NETWORK}" "electrs-${NETWORK}" "mempool-api-${NETWORK}"; do
-                docker compose start "${svc}" 2>/dev/null || true
-            done
             exit 1
         fi
     done
@@ -359,3 +381,5 @@ log_success "Components: ${!BACKUP_SOURCES[*]}"
 if [[ "${NO_UPLOAD}" == "false" ]]; then
     log_success "Remote:     ${REMOTE_BASE}"
 fi
+
+trap - EXIT
