@@ -1052,7 +1052,16 @@ generate_compose() {
     shared_services+="${openresty_volumes}"$'\n'
     shared_services+="    networks:"$'\n'
     shared_services+="      - mempool_net"$'\n'
-    shared_services+="${security_block}"
+    shared_services+="    restart: unless-stopped"$'\n'
+    shared_services+="    security_opt:"$'\n'
+    shared_services+="      - no-new-privileges:true"$'\n'
+    shared_services+="    cap_drop:"$'\n'
+    shared_services+="      - ALL"$'\n'
+    shared_services+="    cap_add:"$'\n'
+    shared_services+="      - CHOWN"$'\n'
+    shared_services+="      - SETUID"$'\n'
+    shared_services+="      - SETGID"$'\n'
+    shared_services+="      - NET_BIND_SERVICE"
 
     # --- cloudflared (conditional) ---
     local tunnel_enabled
