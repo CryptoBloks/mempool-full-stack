@@ -640,7 +640,7 @@ generate_nginx_conf() {
             block+="                return 204;"$'\n'
             block+="            }"$'\n'
             block+=$'\n'
-            block+="            proxy_pass http://${btc_host}:${btc_rpc_port}/;"$'\n'
+            block+="            proxy_pass http://${btc_host}:${btc_rpc_port};"$'\n'
             block+="${proxy_common}"$'\n'
             block+="        }"
             printf '%s' "${block}"
@@ -982,6 +982,11 @@ generate_compose() {
     shared_services+="    container_name: mempool-web"$'\n'
     shared_services+="    environment:"$'\n'
     shared_services+="${frontend_env}"$'\n'
+    shared_services+="    depends_on:"$'\n'
+    for net in "${networks[@]}"; do
+        shared_services+="      mempool-api-${net}:"$'\n'
+        shared_services+="        condition: service_started"$'\n'
+    done
     shared_services+="    expose:"$'\n'
     shared_services+="      - \"8080\""$'\n'
     shared_services+="    networks:"$'\n'
@@ -1037,6 +1042,10 @@ generate_compose() {
     shared_services+="    depends_on:"$'\n'
     shared_services+="      mempool-web:"$'\n'
     shared_services+="        condition: service_started"$'\n'
+    for net in "${networks[@]}"; do
+        shared_services+="      mempool-api-${net}:"$'\n'
+        shared_services+="        condition: service_started"$'\n'
+    done
     shared_services+="    ports:"$'\n'
     shared_services+="${openresty_ports}"$'\n'
     shared_services+="    volumes:"$'\n'
@@ -1057,9 +1066,7 @@ generate_compose() {
         shared_services+="  cloudflared:"$'\n'
         shared_services+="    image: $(get_docker_image cloudflared)"$'\n'
         shared_services+="    container_name: cloudflared"$'\n'
-        shared_services+="    command: tunnel --config /etc/cloudflared/config.yml run"$'\n'
-        shared_services+="    volumes:"$'\n'
-        shared_services+="      - ./config/cloudflared:/etc/cloudflared:ro"$'\n'
+        shared_services+="    command: tunnel run --token ${tunnel_token}"$'\n'
         shared_services+="    depends_on:"$'\n'
         shared_services+="      openresty:"$'\n'
         shared_services+="        condition: service_started"$'\n'
