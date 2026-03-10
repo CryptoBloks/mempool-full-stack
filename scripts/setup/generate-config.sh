@@ -957,7 +957,7 @@ generate_compose() {
         network_services+="      bitcoind-${net}:"$'\n'
         network_services+="        condition: service_healthy"$'\n'
         network_services+="    volumes:"$'\n'
-        network_services+="      - ${storage_path}/${net}/electrs:/data"$'\n'
+        network_services+="      - ${storage_path}/${net}/electrs:/data/${electrs_network}"$'\n'
         network_services+="    expose:"$'\n'
         network_services+="      - \"50001\""$'\n'
         network_services+="    networks:"$'\n'
