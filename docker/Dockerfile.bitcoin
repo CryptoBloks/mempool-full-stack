@@ -22,7 +22,7 @@ RUN cd /tmp \
     && rm -rf /tmp/bitcoin-* /tmp/SHA256SUMS
 
 # Create bitcoin user and data directory
-RUN useradd -m -s /bin/bash bitcoin \
+RUN useradd -m -s /bin/bash -u 10000 bitcoin \
     && mkdir -p /data/.bitcoin \
     && chown -R bitcoin:bitcoin /data
 
