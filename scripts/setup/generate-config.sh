@@ -838,6 +838,9 @@ generate_compose() {
     MARIADB_VERSION="$(get_config MARIADB_VERSION "")"
     OPENRESTY_VERSION="$(get_config OPENRESTY_VERSION "")"
 
+    local bind_ip
+    bind_ip="$(get_config BIND_IP "127.0.0.1")"
+
     local mariadb_root_pass mariadb_user mariadb_pass
     mariadb_root_pass="$(get_config MARIADB_ROOT_PASS)"
     mariadb_user="$(get_config MARIADB_USER mempool)"
@@ -874,7 +877,7 @@ generate_compose() {
         network_services+="      - ${storage_path}/${net}/bitcoin:/data/.bitcoin"$'\n'
         network_services+="      - ./config/${net}/bitcoin.conf:/data/.bitcoin/bitcoin.conf:ro"$'\n'
         network_services+="    ports:"$'\n'
-        network_services+="      - \"${CHAIN_P2P_PORT}:${CHAIN_P2P_PORT}\""$'\n'
+        network_services+="      - \"${bind_ip}:${CHAIN_P2P_PORT}:${CHAIN_P2P_PORT}\""$'\n'
         network_services+="    expose:"$'\n'
         network_services+="      - \"${CHAIN_RPC_PORT}\""$'\n'
         network_services+="    healthcheck:"$'\n'
@@ -1027,16 +1030,16 @@ generate_compose() {
     openresty_volumes="${openresty_volumes%$'\n'}"
 
     local openresty_ports=""
-    openresty_ports+="      - \"${web_port}:80\""
+    openresty_ports+="      - \"${bind_ip}:${web_port}:80\""
     if [[ "${tls_mode}" != "none" ]]; then
         openresty_ports+=$'\n'
-        openresty_ports+="      - \"443:443\""
+        openresty_ports+="      - \"${bind_ip}:443:443\""
     fi
     if [[ "${rpc_enabled}" == "true" ]]; then
         local rpc_port
         rpc_port="$(get_config RPC_PORT 3000)"
         openresty_ports+=$'\n'
-        openresty_ports+="      - \"${rpc_port}:${rpc_port}\""
+        openresty_ports+="      - \"${bind_ip}:${rpc_port}:${rpc_port}\""
     fi
 
     shared_services+="  openresty:"$'\n'

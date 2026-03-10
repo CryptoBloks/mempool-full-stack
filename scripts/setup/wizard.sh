@@ -2,7 +2,7 @@
 # ==============================================================================
 # wizard.sh — Interactive setup wizard for mempool.space full-stack-docker
 #
-# Creates (or updates) node.conf through 11 guided configuration sections,
+# Creates (or updates) node.conf through 12 guided configuration sections,
 # then runs generate-config.sh to render all service configs and compose file.
 #
 # Usage:
@@ -111,7 +111,7 @@ BANNER
 # Section 1: Network Selection
 # ==============================================================================
 section_networks() {
-    log_header "1/11 — Network Selection"
+    log_header "1/12 — Network Selection"
 
     local existing
     existing="$(wiz_default NETWORKS "mainnet,signet")"
@@ -199,7 +199,7 @@ section_networks() {
 # Section 2: Bitcoin Core Source
 # ==============================================================================
 section_bitcoin_source() {
-    log_header "2/11 — Bitcoin Core Source"
+    log_header "2/12 — Bitcoin Core Source"
 
     # Only docker-image mode is currently supported.
     # Build-from-source and external Bitcoin Core will be added in a future release.
@@ -211,7 +211,7 @@ section_bitcoin_source() {
 # Section 3: Application Versions
 # ==============================================================================
 section_versions() {
-    log_header "3/11 — Application Versions"
+    log_header "3/12 — Application Versions"
 
     get_default_versions
 
@@ -318,7 +318,7 @@ except: pass
 # Section 4: Storage Configuration
 # ==============================================================================
 section_storage() {
-    log_header "4/11 — Storage Configuration"
+    log_header "4/12 — Storage Configuration"
 
     local default_path
     default_path="$(wiz_default STORAGE_PATH "/data/mempool")"
@@ -365,10 +365,74 @@ section_storage() {
 }
 
 # ==============================================================================
-# Section 5: Bitcoin Core Options
+# Section 5: Bind IP Selection
+# ==============================================================================
+section_bind_ip() {
+    log_header "5/12 — Bind IP Address"
+
+    # Detect system IPs
+    local -a system_ips=()
+    if command -v ip &>/dev/null; then
+        mapfile -t system_ips < <(ip -4 addr show scope global 2>/dev/null \
+            | awk '/inet / { split($2, a, "/"); print a[1] }')
+    elif command -v hostname &>/dev/null; then
+        read -ra system_ips <<< "$(hostname -I 2>/dev/null)"
+    fi
+
+    # Default to first system IP, fall back to 127.0.0.1
+    local first_system_ip="127.0.0.1"
+    if (( ${#system_ips[@]} > 0 )); then
+        first_system_ip="${system_ips[0]}"
+    fi
+
+    local default_ip
+    default_ip="$(wiz_default BIND_IP "${first_system_ip}")"
+
+    if ${NON_INTERACTIVE}; then
+        wiz_set BIND_IP "${default_ip}"
+        log_info "Bind IP: ${default_ip}"
+        return
+    fi
+
+    log_info "Select which IP address to bind exposed services to."
+    log_info "This controls which network interface Docker exposes ports on."
+    printf '\n' >&2
+
+    # Build list of available IPs
+    local -a ip_options=()
+    ip_options+=("127.0.0.1        localhost only")
+
+    for sip in "${system_ips[@]}"; do
+        [[ "${sip}" == "127.0.0.1" ]] && continue
+        ip_options+=("${sip}")
+    done
+
+    # Determine default selection index
+    local default_idx=1
+    local i
+    for i in "${!ip_options[@]}"; do
+        local opt_ip="${ip_options[$i]%% *}"
+        if [[ "${opt_ip}" == "${default_ip}" ]]; then
+            default_idx=$(( i + 1 ))
+            break
+        fi
+    done
+
+    local choice
+    choice="$(ask_choice "Select bind IP address:" ip_options "${default_idx}")"
+
+    # Extract just the IP (first whitespace-delimited token)
+    local bind_ip="${choice%% *}"
+
+    wiz_set BIND_IP "${bind_ip}"
+    log_success "Bind IP: ${bind_ip}"
+}
+
+# ==============================================================================
+# Section 6: Bitcoin Core Options
 # ==============================================================================
 section_bitcoin_options() {
-    log_header "5/11 — Bitcoin Core Options"
+    log_header "6/12 — Bitcoin Core Options"
 
     local default_txindex
     default_txindex="$(wiz_default TXINDEX "true")"
@@ -427,10 +491,10 @@ section_bitcoin_options() {
 }
 
 # ==============================================================================
-# Section 6: RPC Web Endpoint
+# Section 7: RPC Web Endpoint
 # ==============================================================================
 section_rpc_endpoint() {
-    log_header "6/11 — RPC Web Endpoint"
+    log_header "7/12 — RPC Web Endpoint"
 
     local default_enabled
     default_enabled="$(wiz_default RPC_ENDPOINT_ENABLED "false")"
@@ -538,10 +602,10 @@ section_rpc_endpoint() {
 }
 
 # ==============================================================================
-# Section 7: Port Configuration
+# Section 8: Port Configuration
 # ==============================================================================
 section_ports() {
-    log_header "7/11 — Port Configuration"
+    log_header "8/12 — Port Configuration"
 
     local default_web
     default_web="$(wiz_default WEB_PORT "80")"
@@ -598,10 +662,10 @@ section_ports() {
 }
 
 # ==============================================================================
-# Section 8: SSL/TLS
+# Section 9: SSL/TLS
 # ==============================================================================
 section_tls() {
-    log_header "8/11 — SSL/TLS Configuration"
+    log_header "9/12 — SSL/TLS Configuration"
 
     local default_mode
     default_mode="$(wiz_default TLS_MODE "none")"
@@ -653,10 +717,10 @@ section_tls() {
 }
 
 # ==============================================================================
-# Section 9: Cloudflare Tunnel
+# Section 10: Cloudflare Tunnel
 # ==============================================================================
 section_cloudflare() {
-    log_header "9/11 — Cloudflare Tunnel"
+    log_header "10/12 — Cloudflare Tunnel"
 
     local default_enabled
     default_enabled="$(wiz_default CLOUDFLARE_TUNNEL_ENABLED "false")"
@@ -696,6 +760,17 @@ section_cloudflare() {
             fi
         fi
 
+        # Ask about local network access
+        printf '\n' >&2
+        log_info "With Cloudflare Tunnel, external traffic flows through the tunnel."
+        log_info "You can also keep web/RPC ports open on the local network."
+        if ask_yes_no "Keep web and RPC ports accessible on local network?" "y"; then
+            log_info "Local ports will remain bound to the configured bind IP."
+        else
+            wiz_set BIND_IP "127.0.0.1"
+            log_info "Ports bound to 127.0.0.1 — only tunnel traffic can reach services."
+        fi
+
         log_success "Cloudflare Tunnel enabled."
     else
         wiz_set CLOUDFLARE_TUNNEL_ENABLED "false"
@@ -704,10 +779,10 @@ section_cloudflare() {
 }
 
 # ==============================================================================
-# Section 10: Firewall
+# Section 11: Firewall
 # ==============================================================================
 section_firewall() {
-    log_header "10/11 — Firewall Configuration"
+    log_header "11/12 — Firewall Configuration"
 
     local default_enabled
     default_enabled="$(wiz_default UFW_ENABLED "true")"
@@ -776,10 +851,10 @@ section_firewall() {
 }
 
 # ==============================================================================
-# Section 11: Credentials
+# Section 12: Credentials
 # ==============================================================================
 section_credentials() {
-    log_header "11/11 — Credential Generation"
+    log_header "12/12 — Credential Generation"
 
     if ${NON_INTERACTIVE}; then
         # Ensure all required credentials exist; generate if missing
@@ -888,6 +963,7 @@ show_summary() {
     log_info "Networks:       ${networks}"
     log_info "Bitcoin mode:   ${bitcoin_mode}"
     log_info "Storage path:   ${storage_path}"
+    log_info "Bind IP:        $(get_config BIND_IP "127.0.0.1")"
     log_info "txindex:        ${txindex}"
     log_info "Bitcoin Core:   v$(get_config BITCOIN_VERSION)"
     log_info "Mempool:        v$(get_config MEMPOOL_VERSION)"
@@ -935,11 +1011,12 @@ main() {
         log_info "No existing configuration found. Starting fresh."
     fi
 
-    # Run all 11 sections
+    # Run all 12 sections
     section_networks
     section_bitcoin_source
     section_versions
     section_storage
+    section_bind_ip
     section_bitcoin_options
     section_rpc_endpoint
     section_ports
