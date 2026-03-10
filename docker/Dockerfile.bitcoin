@@ -1,26 +1,25 @@
 FROM ubuntu:24.04
 
-# Build-from-source Dockerfile for Bitcoin Core.
-# Used only when BITCOIN_MODE=build in node.conf.
-# The default mode (docker-image) pulls pre-built images from Docker Hub.
+# Dockerfile for Bitcoin Core (pre-built binary).
+# Downloads and verifies the official release binary.
 
 ARG BITCOIN_VERSION=28.1
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install build dependencies
+# Install minimal runtime dependencies
 RUN apt-get update && apt-get install -y \
-    autoconf automake build-essential libtool pkg-config \
-    libboost-all-dev libevent-dev libssl-dev \
-    bsdmainutils wget ca-certificates \
+    wget ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Download and verify Bitcoin Core release
+# Download, verify, and install Bitcoin Core release
 RUN cd /tmp \
     && wget -q "https://bitcoincore.org/bin/bitcoin-core-${BITCOIN_VERSION}/bitcoin-${BITCOIN_VERSION}-x86_64-linux-gnu.tar.gz" \
+    && wget -q "https://bitcoincore.org/bin/bitcoin-core-${BITCOIN_VERSION}/SHA256SUMS" \
+    && grep "x86_64-linux-gnu.tar.gz" SHA256SUMS | sha256sum -c - \
     && tar -xzf "bitcoin-${BITCOIN_VERSION}-x86_64-linux-gnu.tar.gz" \
     && install -m 0755 bitcoin-${BITCOIN_VERSION}/bin/* /usr/local/bin/ \
-    && rm -rf /tmp/bitcoin-*
+    && rm -rf /tmp/bitcoin-* /tmp/SHA256SUMS
 
 # Create bitcoin user and data directory
 RUN useradd -m -s /bin/bash -u 1000 bitcoin \

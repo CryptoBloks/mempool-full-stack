@@ -449,7 +449,6 @@ section_rpc_endpoint() {
     if ${NON_INTERACTIVE}; then
         wiz_set RPC_ENDPOINT_ENABLED "${default_enabled}"
         if [[ "${default_enabled}" == "true" ]]; then
-            wiz_set RPC_AUTH_MODE "$(wiz_default RPC_AUTH_MODE "api-key")"
             wiz_set RPC_METHOD_PROFILE "$(wiz_default RPC_METHOD_PROFILE "read-only")"
             wiz_set RPC_RATE_LIMIT "$(wiz_default RPC_RATE_LIMIT "60")"
             wiz_set RPC_PORT "$(wiz_default RPC_PORT "3000")"
@@ -484,10 +483,6 @@ section_rpc_endpoint() {
             log_warn "RPC endpoint works best with txindex=true (currently ${txindex})."
             log_warn "Some RPC methods may not work without txindex."
         fi
-
-        # Only api-key auth mode is currently implemented
-        wiz_set RPC_AUTH_MODE "api-key"
-        log_info "Auth mode: api-key (path-based and X-API-Key header)"
 
         # API key generation
         local existing_key
@@ -654,14 +649,6 @@ section_tls() {
             email="$(ask_input "Let's Encrypt notification email" "$(wiz_default LETSENCRYPT_EMAIL "")")"
             wiz_set DOMAIN_WEB "${domain}"
             wiz_set LETSENCRYPT_EMAIL "${email}"
-
-            local rpc_enabled
-            rpc_enabled="$(get_config RPC_ENDPOINT_ENABLED "false")"
-            if [[ "${rpc_enabled}" == "true" ]]; then
-                local rpc_domain
-                rpc_domain="$(ask_input "Domain name for RPC endpoint (or same as web)" "$(wiz_default DOMAIN_RPC "${domain}")")"
-                wiz_set DOMAIN_RPC "${rpc_domain}"
-            fi
             ;;
         self-signed)
             local domain

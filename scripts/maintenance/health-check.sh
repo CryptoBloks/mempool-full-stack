@@ -189,16 +189,11 @@ for net in "${nets[@]}"; do
     fi
 
     # Check if Electrs TCP port is listening (port 50001 inside container)
-    if docker compose exec -T "${container}" sh -c 'echo | nc -w 2 localhost 50001' &>/dev/null; then
+    if docker compose exec -T "${container}" sh -c 'nc -z localhost 50001' &>/dev/null 2>&1; then
         log_success "${container}: listening on port 50001"
     else
-        # Electrs may not have nc; try a different approach
-        if docker compose exec -T "${container}" sh -c 'cat < /dev/tcp/localhost/50001' &>/dev/null 2>&1; then
-            log_success "${container}: listening on port 50001"
-        else
-            log_warn "${container}: port 50001 not responsive (may still be indexing)"
-            ISSUES=$((ISSUES + 1))
-        fi
+        log_warn "${container}: port 50001 not responsive (may still be indexing)"
+        ISSUES=$((ISSUES + 1))
     fi
 done
 

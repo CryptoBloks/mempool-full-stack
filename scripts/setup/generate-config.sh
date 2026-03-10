@@ -1308,8 +1308,14 @@ main() {
     fi
 
     # ---- Generate firewall rules ----
-    log_info "Generating UFW firewall rules..."
-    generate_ufw_rules
+    local ufw_enabled
+    ufw_enabled="$(get_config UFW_ENABLED true)"
+    if [[ "${ufw_enabled}" == "true" ]]; then
+        log_info "Generating UFW firewall rules..."
+        generate_ufw_rules
+    else
+        log_info "UFW disabled — skipping firewall rules generation."
+    fi
 
     # ---- Summary ----
     log_header "Generation complete"

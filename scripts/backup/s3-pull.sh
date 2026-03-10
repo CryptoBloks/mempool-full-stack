@@ -51,7 +51,7 @@ START_TIME=$(date +%s)
 
 rclone cat "${REMOTE_PATH}" \
     | zstd -d \
-    | tar -xf - -C "${DEST_DIR}"
+    | tar -xf - -C "${DEST_DIR}" --strip-components=1
 
 END_TIME=$(date +%s)
 DURATION=$((END_TIME - START_TIME))

@@ -290,6 +290,47 @@ if [[ -n "${rpc_pass}" ]]; then
     fi
 fi
 
+# L4: Normalize TXINDEX to JSON boolean
+case "${TXINDEX}" in
+    true|yes|1) TXINDEX="true" ;;
+    *)          TXINDEX="false" ;;
+esac
+
+# M5: Build components JSON dynamically from BACKUP_SOURCES
+COMP_JSON=""
+for comp in "${!BACKUP_SOURCES[@]}"; do
+    [[ -n "${COMP_JSON}" ]] && COMP_JSON+=","$'\n'
+    case "${comp}" in
+        bitcoin)
+            COMP_JSON+="    \"bitcoin\": {"$'\n'
+            COMP_JSON+="      \"version\": \"${BITCOIN_VERSION}\","$'\n'
+            COMP_JSON+="      \"block_height\": ${BLOCK_HEIGHT:-0},"$'\n'
+            COMP_JSON+="      \"txindex\": ${TXINDEX},"$'\n'
+            COMP_JSON+="      \"size_bytes\": ${COMP_SIZES["bitcoin"]:-0}"$'\n'
+            COMP_JSON+="    }"
+            ;;
+        electrs)
+            COMP_JSON+="    \"electrs\": {"$'\n'
+            COMP_JSON+="      \"version\": \"${ELECTRS_VERSION}\","$'\n'
+            COMP_JSON+="      \"size_bytes\": ${COMP_SIZES["electrs"]:-0}"$'\n'
+            COMP_JSON+="    }"
+            ;;
+        mariadb)
+            COMP_JSON+="    \"mariadb\": {"$'\n'
+            COMP_JSON+="      \"version\": \"${MARIADB_VERSION}\","$'\n'
+            COMP_JSON+="      \"databases\": [\"mempool\"],"$'\n'
+            COMP_JSON+="      \"size_bytes\": ${COMP_SIZES["mariadb"]:-0}"$'\n'
+            COMP_JSON+="    }"
+            ;;
+        mempool)
+            COMP_JSON+="    \"mempool\": {"$'\n'
+            COMP_JSON+="      \"version\": \"${MEMPOOL_VERSION}\","$'\n'
+            COMP_JSON+="      \"size_bytes\": ${COMP_SIZES["mempool"]:-0}"$'\n'
+            COMP_JSON+="    }"
+            ;;
+    esac
+done
+
 # Build manifest
 MANIFEST=$(cat <<MANIFEST_EOF
 {
@@ -297,25 +338,7 @@ MANIFEST=$(cat <<MANIFEST_EOF
   "network": "${NETWORK}",
   "date": "$(date -u '+%Y-%m-%dT%H:%M:%S+00:00')",
   "components": {
-    "bitcoin": {
-      "version": "${BITCOIN_VERSION}",
-      "block_height": ${BLOCK_HEIGHT:-0},
-      "txindex": ${TXINDEX},
-      "size_bytes": ${COMP_SIZES["bitcoin"]:-0}
-    },
-    "electrs": {
-      "version": "${ELECTRS_VERSION}",
-      "size_bytes": ${COMP_SIZES["electrs"]:-0}
-    },
-    "mariadb": {
-      "version": "${MARIADB_VERSION}",
-      "databases": ["mempool"],
-      "size_bytes": ${COMP_SIZES["mariadb"]:-0}
-    },
-    "mempool": {
-      "version": "${MEMPOOL_VERSION}",
-      "size_bytes": ${COMP_SIZES["mempool"]:-0}
-    }
+${COMP_JSON}
   },
   "btrfs": ${USE_BTRFS},
   "zstd_level": 3,
