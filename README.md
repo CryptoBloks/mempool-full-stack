@@ -1,248 +1,312 @@
-# Mempool.space Docker Full Stack
+# Mempool.space Full Stack Docker
 
-This repository contains a Docker Compose setup for running a complete mempool.space stack, including:
-- Bitcoin Core
-- Fulcrum (Electrum server)
-- MariaDB
-- Mempool.space frontend and backend
+A configurator-driven, self-hosted Bitcoin infrastructure platform. Deploy a complete mempool.space block explorer with multi-network support, an optional RPC gateway, and full backup/restore — all driven by a single interactive wizard.
 
-All services are built on Ubuntu 24.04 LTS for consistency and long-term support.
+## What You Get
+
+- **Mempool.space block explorer** — frontend + backend for mainnet, signet, and/or testnet
+- **Bitcoin Core** — per-network full nodes
+- **Electrs** — per-network Electrum server (indexer)
+- **MariaDB** — shared database backend
+- **OpenResty** — reverse proxy with Lua-based RPC gateway (optional)
+- **Cloudflare Tunnel** — optional zero-trust remote access
+- **BTRFS snapshot backup** — streaming to S3 with zstd compression
 
 ## Prerequisites
 
-- Docker
-- Docker Compose
-- OpenSSL (for certificate generation)
-- At least 500GB of free disk space (for Bitcoin blockchain)
+- Docker and Docker Compose (v2)
+- Bash 4.0+
+- 600GB+ disk space (mainnet), ~5GB (signet), ~30GB (testnet)
 - 8GB+ RAM recommended
+- Python 3 (for rpcauth HMAC generation)
+- `jq` (for RPC key management scripts)
 
 ## Quick Start
 
-1. Clone this repository:
 ```bash
 git clone <repository-url>
-cd mempool.space-docker-full-stack
+cd mempool.space-full-stack-docker
+
+# Run the interactive setup wizard
+./scripts/setup/wizard.sh
+
+# Start the stack
+docker compose up -d
 ```
 
-2. Create your environment file:
-```bash
-cp .env.example .env
-```
+The wizard walks through 11 configuration sections: network selection, versions, storage, Bitcoin Core options, RPC endpoint, ports, SSL/TLS, Cloudflare Tunnel, firewall, and credentials. It generates `node.conf` and then calls `generate-config.sh` to produce all service configuration files.
 
-3. Edit the `.env` file with your desired values. Make sure to:
-   - Change all default passwords
-   - Use strong, unique passwords
-   - Keep this file secure as it contains sensitive information
-
-4. Run the setup script:
-```bash
-./setup.sh
-```
-
-5. Build and start the services:
-```bash
-./build.sh
-```
-
-## Base System Information
-
-All containers are built on Ubuntu 24.04 LTS, providing:
-- Consistent package management (apt)
-- Latest security updates and patches
-- Modern system libraries and tools
-- Better compatibility with newer software versions
-- Long-term support until 2029
-
-### Service Versions
-- Bitcoin Core: 25.0
-- Fulcrum: 1.9.0
-- MariaDB: 10.6
-- Mempool: 2.3.0
-- Node.js: 20.x
-
-## Port Configuration and Security
-
-### Exposed Ports (External Access)
-- 80: Mempool.space web interface
-- 8333: Bitcoin Core P2P (required for Bitcoin network)
-
-### Protected Ports (Internal Only)
-- 8332: Bitcoin Core RPC
-- 50001: Fulcrum Electrum protocol
-- 50002: Fulcrum SSL
-- 3306: MariaDB
-
-All internal services are protected and only accessible within the Docker network. For detailed security information, see [Security Documentation](.project/SECURITY.md).
-
-## Building from Source
-
-The project uses custom Dockerfiles to build each service from source on Ubuntu 24.04. This ensures:
-- Consistent base system across all services
-- Latest security patches
-- Optimized builds for your system
-- Full control over the build process
-
-### Build Process
-1. The `build.sh` script handles the entire build process:
-   - Checks prerequisites
-   - Cleans up old images
-   - Builds new images
-   - Verifies the build
-   - Tests service health
-
-2. To rebuild a specific service:
-```bash
-docker-compose build <service-name>
-```
-
-3. To rebuild all services:
-```bash
-./build.sh
-```
-
-## Service Details
-
-### Bitcoin Core
-- Base: Ubuntu 24.04 LTS
-- Ports:
-  - 8332: RPC (internal only)
-  - 8333: P2P (external)
-- Data directory: `./data/bitcoin`
-- Config directory: `./config/bitcoin`
-- Health check: Monitors blockchain status
-- Security: RPC access restricted to Docker network
-
-### Fulcrum (Electrum Server)
-- Base: Ubuntu 24.04 LTS
-- Ports:
-  - 50001: Electrum protocol (internal only)
-  - 50002: SSL (internal only)
-- Data directory: `./data/fulcrum`
-- Config directory: `./config/fulcrum`
-- SSL certificates: Automatically generated during setup
-- Health check: Monitors service availability
-- Security: SSL/TLS enabled, internal access only
-
-### MariaDB
-- Base: Ubuntu 24.04 LTS
-- Port: 3306 (internal only)
-- Data directory: `./data/mariadb`
-- Config directory: `./config/mariadb`
-- Database: mempool
-- Health check: Monitors database connectivity
-- Security: Internal access only, authentication required
-
-### Mempool.space
-- Base: Ubuntu 24.04 LTS
-- Port: 80 (external)
-- Data directory: `./data/mempool`
-- Config directory: `./config/mempool`
-- Health check: Monitors API availability
-- Security: Public web interface, protected backend
-
-## Initial Sync
-
-The initial Bitcoin blockchain sync may take several days depending on your internet connection and hardware. You can monitor the progress through the Bitcoin Core logs:
+### Non-Interactive Setup
 
 ```bash
-docker-compose logs -f bitcoin
+# Generate default config (mainnet + signet) and all files
+./scripts/setup/wizard.sh --non-interactive
+
+docker compose up -d
 ```
 
-## Security Considerations
+## Architecture
 
-1. Change the default RPC credentials in the `.env` file
-2. Consider using a reverse proxy with SSL for the mempool.space frontend
-3. Restrict RPC access to trusted IPs in production
-4. Regularly backup the data directories
-5. SSL certificates for Fulcrum are automatically generated during setup
-6. MariaDB credentials should be changed from defaults in production
-7. Keep your `.env` file secure and never commit it to version control
-8. Review and follow the [Security Documentation](.project/SECURITY.md) for best practices
+### Configuration Flow
+
+```
+wizard.sh → node.conf → generate-config.sh → docker-compose.yml
+                                            → config/{network}/bitcoin.conf
+                                            → config/{network}/electrs.toml
+                                            → config/{network}/mempool-config.json
+                                            → config/openresty/nginx.conf
+                                            → config/mariadb/init/01-init.sql
+                                            → config/ufw-rules.sh
+                                            → (optional) config/openresty/jsonrpc-access.lua
+                                            → (optional) config/openresty/api-keys.json
+                                            → (optional) config/cloudflared/config.yml
+```
+
+`node.conf` is the single source of truth. Re-running the wizard with an existing `node.conf` pre-fills previous values as defaults.
+
+### Container Layout
+
+Per-network services (one set per enabled network):
+- `bitcoind-{network}` — Bitcoin Core full node
+- `electrs-{network}` — Electrs indexer
+- `mempool-api-{network}` — Mempool backend API
+
+Shared services:
+- `mariadb` — MariaDB database
+- `mempool-web` — Mempool frontend
+- `openresty` — Reverse proxy / RPC gateway
+- `cloudflared` — Cloudflare Tunnel (optional)
+
+All containers run on the `mempool_net` bridge network (172.20.0.0/24).
+
+### Default Versions
+
+| Component | Default Version |
+|-----------|----------------|
+| Bitcoin Core | 28.1 |
+| Mempool | 3.1.0 |
+| Electrs | latest |
+| MariaDB | 10.11 |
+| OpenResty | alpine |
+
+## Node Management
+
+```bash
+# Start/stop/restart all or per-network
+./scripts/node/start.sh [--network mainnet]
+./scripts/node/stop.sh [--network mainnet]
+./scripts/node/restart.sh [--network mainnet]
+
+# View status (containers, sync progress, disk usage)
+./scripts/node/status.sh
+
+# Follow logs
+./scripts/node/logs.sh [--service bitcoind-mainnet] [--follow] [--lines 100]
+```
+
+## RPC Gateway (Optional)
+
+When `RPC_ENDPOINT_ENABLED=true`, OpenResty exposes a Bitcoin JSON-RPC endpoint with API key authentication, per-key rate limiting, method whitelisting, and per-network routing.
+
+```bash
+# Add an API key
+./scripts/rpc/add-key.sh --name "my-app" --rate-limit 120
+
+# Make a request (path-based auth)
+curl -X POST http://your-server:3000/rpc/v1/YOUR_API_KEY \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"getblockchaininfo","params":[]}'
+
+# Or use header-based auth
+curl -X POST http://your-server:3000/rpc/v1/default \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"getblockcount","params":[]}'
+
+# Per-network routing
+curl -X POST http://your-server:3000/rpc/v1/YOUR_API_KEY/signet ...
+
+# Manage keys
+./scripts/rpc/list-keys.sh
+./scripts/rpc/revoke-key.sh <key>
+
+# Test the endpoint
+./scripts/rpc/test-endpoint.sh --method getblockchaininfo
+```
+
+Method whitelist profiles control which RPC methods are accessible:
+- **read-only** — 27 safe query methods (getblock, getblockchaininfo, estimatesmartfee, etc.)
+- **standard** — read-only + sendrawtransaction, testmempoolaccept
+- **full** — standard + wallet and advanced methods (admin use only)
+
+Dangerous methods (`stop`, `dumpprivkey`, `dumpwallet`, `importprivkey`, etc.) are blocked in all profiles. Defense-in-depth: Bitcoin Core enforces a separate `rpcwhitelist` on the gateway's RPC user.
+
+See **[docs/RPC_GATEWAY.md](docs/RPC_GATEWAY.md)** for the full guide: key management, method reference, rate limiting behavior, error codes, and CORS configuration.
+
+## SSL/TLS
+
+Three modes: `none`, `self-signed`, or `letsencrypt` (set during wizard or in `node.conf`).
+
+```bash
+# Self-signed certificate (2048-bit RSA, 365-day, SAN support)
+./scripts/ssl/generate-self-signed.sh [--domain mempool.local]
+
+# Let's Encrypt (requires public DNS + port 80 accessible)
+sudo ./scripts/ssl/setup-letsencrypt.sh --domain mempool.example.com --email you@example.com
+
+# Test with staging server first
+sudo ./scripts/ssl/setup-letsencrypt.sh --domain mempool.example.com --email you@example.com --staging
+```
+
+Let's Encrypt certificates auto-renew via certbot timer or acme.sh cron. When using Cloudflare Tunnel, TLS is handled by Cloudflare — set `TLS_MODE=none`.
+
+See **[docs/SSL_CERTIFICATES.md](docs/SSL_CERTIFICATES.md)** for details on each mode, prerequisites, and troubleshooting.
+
+## Cloudflare Tunnel
+
+Zero-trust remote access without opening inbound ports. Traffic flows outbound through an encrypted tunnel to Cloudflare's edge, then to your users.
+
+```bash
+# Interactive setup (guided prompts for token and hostnames)
+./scripts/tunnel/setup-tunnel.sh
+
+# Non-interactive (for automation)
+./scripts/tunnel/setup-tunnel.sh --non-interactive --token eyJhIjoiNjM0...
+```
+
+When enabled:
+- The `cloudflared` container connects outbound to Cloudflare (no inbound ports needed)
+- Firewall rules automatically skip opening web/RPC ports (all traffic arrives via tunnel)
+- Only SSH and Bitcoin P2P ports remain open
+- Your server's IP is hidden behind Cloudflare
+
+Prerequisites: Cloudflare account, domain managed by Cloudflare, a tunnel created in the Zero Trust dashboard.
+
+See **[docs/CLOUDFLARE_TUNNEL.md](docs/CLOUDFLARE_TUNNEL.md)** for step-by-step setup, hostname configuration, and troubleshooting.
+
+## Firewall
+
+The generated `config/ufw-rules.sh` includes:
+- Docker-aware UFW rules (DOCKER-USER iptables chain — prevents Docker from bypassing UFW)
+- Tunnel-aware logic (web/RPC ports skipped when Cloudflare Tunnel is enabled)
+- Bitcoin P2P ports always open (8333/38333/18333)
+- SSH always allowed
+
+## Backup & Restore
+
+### BTRFS Snapshots (Recommended)
+
+```bash
+# Create snapshots
+./scripts/snapshot/create.sh [--network mainnet]
+./scripts/snapshot/list.sh
+./scripts/snapshot/prune.sh --keep 5
+```
+
+### S3 Backup (Streaming)
+
+```bash
+# Full backup: stop → snapshot → restart → upload → prune
+./scripts/backup/full-backup.sh --network mainnet
+
+# List / prune remote backups
+./scripts/backup/s3-list.sh
+./scripts/backup/s3-prune.sh --keep 3
+
+# Restore from S3 or local snapshot
+./scripts/backup/restore.sh --network mainnet --source s3 --backup-id <id>
+```
+
+Backups stream via `tar | zstd -T0 -3 | rclone rcat` with no intermediate files. BTRFS-aware mode creates read-only snapshots for minimal downtime (~30-60s).
 
 ## Maintenance
 
-### Updating
 ```bash
-# Update all services
-./build.sh
+# Health check (containers, sync, MariaDB, disk, Electrs)
+./scripts/maintenance/health-check.sh
 
-# Update specific service
-docker-compose build <service-name>
-docker-compose up -d <service-name>
+# Check for updates / apply updates
+./scripts/maintenance/update.sh --check-only
+./scripts/maintenance/update.sh
 ```
 
-### Backup
-Regularly backup the following directories:
-- `./data/bitcoin`
-- `./data/fulcrum`
-- `./data/mempool`
-- `./data/mariadb`
+## Validation
 
-### Monitoring
-Monitor the services using:
 ```bash
-docker-compose ps
-docker-compose logs -f
+# Validate node.conf + all generated files
+./scripts/setup/validate-config.sh
 ```
-
-## Troubleshooting
-
-1. If Bitcoin Core fails to start, check the logs:
-```bash
-docker-compose logs bitcoin
-```
-
-2. If Fulcrum fails to connect to Bitcoin Core, verify the RPC credentials and wait for Bitcoin Core to be fully synced.
-
-3. If Mempool.space fails to connect to Fulcrum, ensure Fulcrum is fully synced and the connection details are correct.
-
-4. If MariaDB fails to start, check the logs:
-```bash
-docker-compose logs mariadb
-```
-
-5. If services are not starting in the correct order, check the health checks:
-```bash
-docker-compose ps
-```
-
-6. If you see connection errors, verify your `.env` file settings match the service configurations.
 
 ## Project Structure
 
 ```
 .
+├── scripts/
+│   ├── setup/
+│   │   ├── wizard.sh              # Interactive configurator (11 sections)
+│   │   ├── generate-config.sh     # Template renderer → all config files
+│   │   └── validate-config.sh     # End-to-end config validator
+│   ├── lib/
+│   │   ├── common.sh              # Colors, logging, prompts, validators
+│   │   ├── config-utils.sh        # node.conf read/write
+│   │   └── network-defaults.sh    # Per-network defaults, versions, images
+│   ├── node/
+│   │   ├── start.sh, stop.sh, restart.sh
+│   │   ├── status.sh, logs.sh
+│   ├── rpc/
+│   │   ├── add-key.sh, list-keys.sh, revoke-key.sh, test-endpoint.sh
+│   ├── backup/
+│   │   ├── full-backup.sh, restore.sh
+│   │   ├── s3-push.sh, s3-pull.sh, s3-list.sh, s3-prune.sh
+│   ├── snapshot/
+│   │   ├── create.sh, list.sh, prune.sh
+│   ├── ssl/
+│   │   ├── generate-self-signed.sh, setup-letsencrypt.sh
+│   ├── tunnel/
+│   │   └── setup-tunnel.sh
+│   └── maintenance/
+│       ├── health-check.sh, update.sh
 ├── config/
-│   ├── bitcoin/
-│   │   └── bitcoin.conf
-│   ├── fulcrum/
-│   │   ├── fulcrum.conf
-│   │   ├── fulcrum.key
-│   │   └── fulcrum.cert
-│   ├── mempool/
-│   │   └── mempool-config.json
-│   └── mariadb/
-│       └── init/
-│           └── 01-init.sql
-├── data/
-│   ├── bitcoin/
-│   ├── fulcrum/
-│   ├── mempool/
-│   └── mariadb/
-├── .project/
-│   ├── COMMANDS.md
-│   └── SECURITY.md
-├── Dockerfile.bitcoin
-├── Dockerfile.fulcrum
-├── Dockerfile.mariadb
-├── Dockerfile.mempool
-├── docker-compose.yml
-├── setup.sh
-├── build.sh
-├── .env.example
+│   └── templates/                 # 9 .tmpl files (tracked in git)
+├── docker/
+│   ├── Dockerfile.bitcoin         # Build-from-source (optional)
+│   └── Dockerfile.fulcrum         # Build-from-source (optional)
+├── docs/
+│   ├── ARCHITECTURE.md            # System design and internals
+│   ├── BACKUP.md                  # Backup, restore, and snapshot guide
+│   ├── CLOUDFLARE_TUNNEL.md       # Cloudflare Tunnel setup guide
+│   ├── RPC_GATEWAY.md             # RPC gateway and API key guide
+│   └── SSL_CERTIFICATES.md        # SSL/TLS certificate guide
+├── node.conf                      # Generated by wizard (gitignored)
+├── docker-compose.yml             # Generated from template (gitignored)
+├── AGENTS.md
+├── CHANGELOG.md
 └── README.md
 ```
 
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System design: config flow, multi-network layout, container inventory, security model |
+| [docs/RPC_GATEWAY.md](docs/RPC_GATEWAY.md) | RPC gateway: API keys, method profiles, rate limiting, error codes, usage examples |
+| [docs/CLOUDFLARE_TUNNEL.md](docs/CLOUDFLARE_TUNNEL.md) | Cloudflare Tunnel: prerequisites, setup, firewall changes, troubleshooting |
+| [docs/SSL_CERTIFICATES.md](docs/SSL_CERTIFICATES.md) | SSL/TLS: self-signed, Let's Encrypt, auto-renewal, mode comparison |
+| [docs/BACKUP.md](docs/BACKUP.md) | Backup & restore: BTRFS snapshots, S3 streaming, manifest format, restore procedures |
+| [CHANGELOG.md](CHANGELOG.md) | Release notes and version history |
+
+## Security
+
+- All internal services (RPC, Electrs, MariaDB) are only exposed within the Docker network
+- Containers enforce `no-new-privileges: true` and drop all capabilities
+- Bitcoin P2P port (8333/38333/18333) is the only port exposed to the internet by default
+- Web port (default 80) exposed for the frontend; skipped when using Cloudflare Tunnel
+- RPC gateway uses API key authentication + rate limiting + method whitelisting
+- Docker-aware UFW rules prevent Docker from bypassing the firewall
+- Credentials are auto-generated and stored in `node.conf` (gitignored)
+- All config files mounted read-only into containers
+- All persistent data externalized to host volumes (`${STORAGE_PATH}/`)
+
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details. 
+This project is licensed under the MIT License - see the LICENSE file for details.

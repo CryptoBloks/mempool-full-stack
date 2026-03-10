@@ -23,6 +23,24 @@ logs/
 # Docker
 .docker/
 docker-compose.override.yml
+docker-compose.yml
+
+# Generated configs (from generate-config.sh) — only templates are tracked
+node.conf
+node.conf.backup.*
+config/mainnet/
+config/signet/
+config/testnet/
+config/openresty/
+config/cloudflared/
+config/mariadb/init/
+config/mariadb/my.cnf
+config/ufw-rules.sh
+
+# Legacy V1 config directories (replaced by per-network generated configs)
+config/bitcoin/
+config/fulcrum/
+config/mempool/
 
 # Node.js
 node_modules/
@@ -34,6 +52,7 @@ yarn-error.log*
 # IDE and editor files
 .idea/
 .vscode/
+.cursor/
 *.swp
 *.swo
 *~
@@ -65,3 +84,8 @@ tmp/
 .Trashes
 ehthumbs.db
 Thumbs.db
+_tmp/
+.claude/
+.cursor/
+.gemini/
+.codex/
