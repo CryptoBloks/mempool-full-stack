@@ -640,8 +640,8 @@ generate_nginx_conf() {
             block+="                return 204;"$'\n'
             block+="            }"$'\n'
             block+=$'\n'
-            block+="            rewrite ^.* / break;"$'\n'
-            block+="            proxy_pass http://${btc_host}:${btc_rpc_port};"$'\n'
+            block+="            set \$backend_uri http://${btc_host}:${btc_rpc_port}/;"$'\n'
+            block+="            proxy_pass \$backend_uri;"$'\n'
             block+="${proxy_common}"$'\n'
             block+="        }"
             printf '%s' "${block}"
@@ -650,6 +650,9 @@ generate_nginx_conf() {
         rpc_server_block+="    server {"$'\n'
         rpc_server_block+="        listen ${rpc_port};"$'\n'
         rpc_server_block+="        server_name _;"$'\n'
+        rpc_server_block+=$'\n'
+        rpc_server_block+="        # Docker embedded DNS (required for variable-based proxy_pass)"$'\n'
+        rpc_server_block+="        resolver 127.0.0.11 valid=30s;"$'\n'
 
         # Default RPC route: /rpc/v1/{key} → primary network's bitcoind
         local primary_net="${networks[0]}"
