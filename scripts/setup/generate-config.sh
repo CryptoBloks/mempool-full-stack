@@ -935,8 +935,6 @@ generate_compose() {
         network_services+="      - ${electrs_network}"$'\n'
         network_services+="      - --daemon-rpc-addr"$'\n'
         network_services+="      - bitcoind-${net}:${CHAIN_RPC_PORT}"$'\n'
-        network_services+="      - --daemon-p2p-addr"$'\n'
-        network_services+="      - bitcoind-${net}:${CHAIN_P2P_PORT}"$'\n'
         network_services+="      - --electrum-rpc-addr"$'\n'
         network_services+="      - 0.0.0.0:50001"$'\n'
         network_services+="      - --db-dir"$'\n'
