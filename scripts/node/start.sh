@@ -93,7 +93,7 @@ if [[ "$(get_config BTRFS_ENABLED "false")" == "true" ]]; then
     for _net in "${_nets[@]}"; do
         _btrfs_dirs+=("${STORAGE_PATH}/${_net}/bitcoin")
         _btrfs_dirs+=("${STORAGE_PATH}/${_net}/electrs")
-        _btrfs_dirs+=("${STORAGE_PATH}/${_net}/mempool")
+        _btrfs_dirs+=("${STORAGE_PATH}/${_net}/mempool-cache")
     done
     _btrfs_dirs+=("${STORAGE_PATH}/mariadb")
 
@@ -106,6 +106,10 @@ if [[ "$(get_config BTRFS_ENABLED "false")" == "true" ]]; then
             else
                 log_warn "Failed to create BTRFS subvolume: ${_dir} (falling back to mkdir)"
                 mkdir -p "${_dir}"
+            fi
+            # mempool-cache must be writable by the backend container (UID 1000)
+            if [[ "${_dir}" == */mempool-cache ]]; then
+                chown 1000:1000 "${_dir}"
             fi
         fi
     done

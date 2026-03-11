@@ -119,9 +119,9 @@ fi
 
 # Build URL
 if [[ -n "${NETWORK}" ]]; then
-    URL="http://${HOST}:${PORT}/v1/${API_KEY}/${NETWORK}"
+    URL="http://${HOST}:${PORT}/v2/${API_KEY}/${NETWORK}"
 else
-    URL="http://${HOST}:${PORT}/v1/${API_KEY}"
+    URL="http://${HOST}:${PORT}/v2/${API_KEY}"
 fi
 
 # Build JSON-RPC payload

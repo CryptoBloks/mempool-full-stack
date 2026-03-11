@@ -1,7 +1,7 @@
 {
   "MEMPOOL": {
     "NETWORK": "{{NETWORK}}",
-    "BACKEND": "electrum",
+    "BACKEND": "esplora",
     "HTTP_PORT": 8999,
     "SPAWN_CLUSTER_PROCS": 0,
     "API_URL_PREFIX": "/api/v1/",
@@ -16,10 +16,8 @@
     "USERNAME": "{{BITCOIN_RPC_USER}}",
     "PASSWORD": "{{BITCOIN_RPC_PASS}}"
   },
-  "ELECTRUM": {
-    "HOST": "{{ELECTRS_HOST}}",
-    "PORT": {{ELECTRS_PORT}},
-    "TLS_ENABLED": false
+  "ESPLORA": {
+    "REST_API_URL": "http://{{ELECTRS_HOST}}:3003"
   },
   "DATABASE": {
     "ENABLED": true,
