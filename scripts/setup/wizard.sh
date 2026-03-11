@@ -2,7 +2,7 @@
 # ==============================================================================
 # wizard.sh — Interactive setup wizard for mempool.space full-stack-docker
 #
-# Creates (or updates) node.conf through 13 guided configuration sections,
+# Creates (or updates) node.conf through 12 guided configuration sections,
 # then runs generate-config.sh to render all service configs and compose file.
 #
 # Usage:
@@ -111,7 +111,7 @@ BANNER
 # Section 1: Network Selection
 # ==============================================================================
 section_networks() {
-    log_header "1/13 — Network Selection"
+    log_header "1/12 — Network Selection"
 
     local existing
     existing="$(wiz_default NETWORKS "mainnet,signet")"
@@ -199,7 +199,7 @@ section_networks() {
 # Section 2: Bitcoin Core Source
 # ==============================================================================
 section_bitcoin_source() {
-    log_header "2/13 — Bitcoin Core Source"
+    log_header "2/12 — Bitcoin Core Source"
 
     # Only docker-image mode is currently supported.
     # Build-from-source and external Bitcoin Core will be added in a future release.
@@ -211,7 +211,7 @@ section_bitcoin_source() {
 # Section 3: Application Versions
 # ==============================================================================
 section_versions() {
-    log_header "3/13 — Application Versions"
+    log_header "3/12 — Application Versions"
 
     get_default_versions
 
@@ -318,7 +318,7 @@ except: pass
 # Section 4: Storage Configuration
 # ==============================================================================
 section_storage() {
-    log_header "4/13 — Storage Configuration"
+    log_header "4/12 — Storage Configuration"
 
     local default_path
     default_path="$(wiz_default STORAGE_PATH "/data/mempool")"
@@ -368,7 +368,7 @@ section_storage() {
 # Section 5: Bind IP Selection
 # ==============================================================================
 section_bind_ip() {
-    log_header "5/13 — Bind IP Address"
+    log_header "5/12 — Bind IP Address"
 
     # Detect system IPs
     local -a system_ips=()
@@ -432,7 +432,7 @@ section_bind_ip() {
 # Section 6: Bitcoin Core Options
 # ==============================================================================
 section_bitcoin_options() {
-    log_header "6/13 — Bitcoin Core Options"
+    log_header "6/12 — Bitcoin Core Options"
 
     local default_txindex
     default_txindex="$(wiz_default TXINDEX "true")"
@@ -494,7 +494,7 @@ section_bitcoin_options() {
 # Section 7: RPC Web Endpoint
 # ==============================================================================
 section_rpc_endpoint() {
-    log_header "7/13 — RPC Web Endpoint"
+    log_header "7/12 — RPC Web Endpoint"
 
     local default_enabled
     default_enabled="$(wiz_default RPC_ENDPOINT_ENABLED "false")"
@@ -605,7 +605,7 @@ section_rpc_endpoint() {
 # Section 8: Port Configuration
 # ==============================================================================
 section_ports() {
-    log_header "8/13 — Port Configuration"
+    log_header "8/12 — Port Configuration"
 
     local default_web
     default_web="$(wiz_default WEB_PORT "80")"
@@ -665,7 +665,7 @@ section_ports() {
 # Section 9: SSL/TLS
 # ==============================================================================
 section_tls() {
-    log_header "9/13 — SSL/TLS Configuration"
+    log_header "9/12 — SSL/TLS Configuration"
 
     local default_mode
     default_mode="$(wiz_default TLS_MODE "none")"
@@ -720,7 +720,7 @@ section_tls() {
 # Section 10: Cloudflare Tunnel
 # ==============================================================================
 section_cloudflare() {
-    log_header "10/13 — Cloudflare Tunnel"
+    log_header "10/12 — Cloudflare Tunnel"
 
     local default_enabled
     default_enabled="$(wiz_default CLOUDFLARE_TUNNEL_ENABLED "false")"
@@ -782,7 +782,7 @@ section_cloudflare() {
 # Section 11: Firewall
 # ==============================================================================
 section_firewall() {
-    log_header "11/13 — Firewall Configuration"
+    log_header "11/12 — Firewall Configuration"
 
     local default_enabled
     default_enabled="$(wiz_default UFW_ENABLED "true")"
@@ -851,60 +851,10 @@ section_firewall() {
 }
 
 # ==============================================================================
-# Section 12: Branding
-# ==============================================================================
-section_branding() {
-    log_header "12/13 — Branding"
-
-    if ${NON_INTERACTIVE}; then
-        # Preserve existing branding or skip
-        if ! config_exists BRANDING_NAME; then
-            log_info "No branding configured (non-interactive)."
-        else
-            log_info "Branding: $(get_config BRANDING_NAME)"
-        fi
-        return
-    fi
-
-    log_info "Customize the mempool frontend with your organization's branding."
-    log_info "This sets the site title, logo, and display name."
-    printf '\n' >&2
-
-    local existing_name=""
-    if config_exists BRANDING_NAME; then
-        existing_name="$(get_config BRANDING_NAME)"
-    fi
-
-    if ask_yes_no "Enable custom branding?" "${existing_name:+y}"; then
-        local brand_name brand_title
-        brand_name="$(ask_value "Organization name" "${existing_name}")"
-        wiz_set BRANDING_NAME "${brand_name}"
-
-        local existing_title=""
-        if config_exists BRANDING_TITLE; then
-            existing_title="$(get_config BRANDING_TITLE)"
-        fi
-        brand_title="$(ask_value "Browser tab title" "${existing_title:-${brand_name}}")"
-        wiz_set BRANDING_TITLE "${brand_title}"
-
-        log_info "Place your logo at: config/branding/logo.png"
-        log_info "Recommended size: 512x512 PNG with transparent background."
-        log_success "Branding enabled: ${brand_name}"
-    else
-        # Clear branding if previously set
-        if config_exists BRANDING_NAME; then
-            wiz_set BRANDING_NAME ""
-            wiz_set BRANDING_TITLE ""
-        fi
-        log_info "Branding disabled — default mempool.space branding will be used."
-    fi
-}
-
-# ==============================================================================
-# Section 13: Credentials
+# Section 12: Credentials
 # ==============================================================================
 section_credentials() {
-    log_header "13/13 — Credential Generation"
+    log_header "12/12 — Credential Generation"
 
     if ${NON_INTERACTIVE}; then
         # Ensure all required credentials exist; generate if missing
@@ -1038,14 +988,6 @@ show_summary() {
         log_info "CF Tunnel:      disabled"
     fi
 
-    local brand_name
-    brand_name="$(get_config BRANDING_NAME "")"
-    if [[ -n "${brand_name}" ]]; then
-        log_info "Branding:       ${brand_name}"
-    else
-        log_info "Branding:       disabled"
-    fi
-
     log_info "BTRFS:          $(get_config BTRFS_ENABLED "false")"
 
     printf '\n' >&2
@@ -1069,7 +1011,7 @@ main() {
         log_info "No existing configuration found. Starting fresh."
     fi
 
-    # Run all 13 sections
+    # Run all 12 sections
     section_networks
     section_bitcoin_source
     section_versions
@@ -1081,7 +1023,6 @@ main() {
     section_tls
     section_cloudflare
     section_firewall
-    section_branding
     section_credentials
 
     # Show summary

@@ -67,7 +67,7 @@ openresty → mempool-web + mempool-api-{net}
 .
 ├── scripts/
 │   ├── setup/
-│   │   ├── wizard.sh              # Interactive configurator (13 sections)
+│   │   ├── wizard.sh              # Interactive configurator (11 sections)
 │   │   ├── generate-config.sh     # Template renderer (core generator)
 │   │   └── validate-config.sh     # End-to-end validator
 │   ├── lib/
@@ -82,7 +82,7 @@ openresty → mempool-web + mempool-api-{net}
 │   ├── tunnel/                    # setup-tunnel
 │   └── maintenance/               # health-check, update
 ├── config/
-│   └── templates/                 # 10 .tmpl files (only tracked files in config/)
+│   └── templates/                 # 9 .tmpl files (only tracked files in config/)
 ├── docker/
 │   ├── Dockerfile.bitcoin         # Build-from-source (ARG BITCOIN_VERSION)
 │   └── Dockerfile.fulcrum         # Build-from-source (ARG FULCRUM_VERSION)
