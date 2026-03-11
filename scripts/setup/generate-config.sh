@@ -552,24 +552,59 @@ generate_nginx_conf() {
     upstream_blocks+="        server mempool-web:8080;"$'\n'
     upstream_blocks+="    }"
 
+    # --- Helper: generate API location blocks for a network ---
+    #
+    # All API requests are routed to the mempool backend, matching the
+    # official mempool.space production nginx config. The backend handles
+    # the esplora/electrs split internally — when BACKEND=esplora, it
+    # proxies to electrs HTTP API via ESPLORA.REST_API_URL for routes
+    # it doesn't handle itself.
+    _api_locations() {
+        local net="$1"        # e.g. "mainnet" or "signet"
+        local prefix="$2"     # URL prefix: "" for mainnet, "/${net}" for others
+        local out=""
+
+        local backend="mempool-api-${net}"
+
+        # Websocket
+        out+="        location ${prefix}/api/v1/ws {"$'\n'
+        out+="            rewrite ^${prefix}/api/v1/ws(.*) /api/v1/ws\$1 break;"$'\n'
+        out+="            proxy_pass http://${backend};"$'\n'
+        out+="            proxy_http_version 1.1;"$'\n'
+        out+="            proxy_set_header Upgrade \$http_upgrade;"$'\n'
+        out+="            proxy_set_header Connection \"upgrade\";"$'\n'
+        out+="            proxy_set_header Host \$host;"$'\n'
+        out+="        }"$'\n'
+        out+=$'\n'
+
+        # /api/v1/ → backend
+        out+="        location ${prefix}/api/v1 {"$'\n'
+        out+="            rewrite ^${prefix}/api/v1(.*) /api/v1\$1 break;"$'\n'
+        out+="            proxy_pass http://${backend};"$'\n'
+        out+="            proxy_set_header Host \$host;"$'\n'
+        out+="            proxy_set_header X-Real-IP \$remote_addr;"$'\n'
+        out+="            proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;"$'\n'
+        out+="            proxy_set_header X-Forwarded-Proto \$scheme;"$'\n'
+        out+="        }"$'\n'
+        out+=$'\n'
+
+        # /api/ shorthand → backend (maps to /api/v1/)
+        out+="        location ${prefix}/api/ {"$'\n'
+        out+="            rewrite ^${prefix}/api/(.*) /api/v1/\$1 break;"$'\n'
+        out+="            proxy_pass http://${backend};"$'\n'
+        out+="            proxy_set_header Host \$host;"$'\n'
+        out+="            proxy_set_header X-Real-IP \$remote_addr;"$'\n'
+        out+="            proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;"$'\n'
+        out+="            proxy_set_header X-Forwarded-Proto \$scheme;"$'\n'
+        out+="        }"$'\n'
+
+        echo -n "${out}"
+    }
+
     # --- Build mainnet API locations ---
     local mainnet_api_locations=""
     if is_network_enabled mainnet; then
-        mainnet_api_locations+="        location /api/v1 {"$'\n'
-        mainnet_api_locations+="            proxy_pass http://mempool-api-mainnet/api/v1;"$'\n'
-        mainnet_api_locations+="            proxy_set_header Host \$host;"$'\n'
-        mainnet_api_locations+="            proxy_set_header X-Real-IP \$remote_addr;"$'\n'
-        mainnet_api_locations+="            proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;"$'\n'
-        mainnet_api_locations+="            proxy_set_header X-Forwarded-Proto \$scheme;"$'\n'
-        mainnet_api_locations+="        }"$'\n'
-        mainnet_api_locations+=$'\n'
-        mainnet_api_locations+="        location /api/v1/ws {"$'\n'
-        mainnet_api_locations+="            proxy_pass http://mempool-api-mainnet/api/v1/ws;"$'\n'
-        mainnet_api_locations+="            proxy_http_version 1.1;"$'\n'
-        mainnet_api_locations+="            proxy_set_header Upgrade \$http_upgrade;"$'\n'
-        mainnet_api_locations+="            proxy_set_header Connection \"upgrade\";"$'\n'
-        mainnet_api_locations+="            proxy_set_header Host \$host;"$'\n'
-        mainnet_api_locations+="        }"
+        mainnet_api_locations="$(_api_locations "mainnet" "")"
     else
         mainnet_api_locations="        # (mainnet not enabled)"
     fi
@@ -578,23 +613,8 @@ generate_nginx_conf() {
     local network_api_locations=""
     for net in "${networks[@]}"; do
         [[ "${net}" == "mainnet" ]] && continue
-        network_api_locations+="        location /${net}/api/v1 {"$'\n'
-        network_api_locations+="            rewrite ^/${net}/(.*) /\$1 break;"$'\n'
-        network_api_locations+="            proxy_pass http://mempool-api-${net};"$'\n'
-        network_api_locations+="            proxy_set_header Host \$host;"$'\n'
-        network_api_locations+="            proxy_set_header X-Real-IP \$remote_addr;"$'\n'
-        network_api_locations+="            proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;"$'\n'
-        network_api_locations+="            proxy_set_header X-Forwarded-Proto \$scheme;"$'\n'
-        network_api_locations+="        }"$'\n'
+        network_api_locations+="$(_api_locations "${net}" "/${net}")"
         network_api_locations+=$'\n'
-        network_api_locations+="        location /${net}/api/v1/ws {"$'\n'
-        network_api_locations+="            rewrite ^/${net}/(.*) /\$1 break;"$'\n'
-        network_api_locations+="            proxy_pass http://mempool-api-${net};"$'\n'
-        network_api_locations+="            proxy_http_version 1.1;"$'\n'
-        network_api_locations+="            proxy_set_header Upgrade \$http_upgrade;"$'\n'
-        network_api_locations+="            proxy_set_header Connection \"upgrade\";"$'\n'
-        network_api_locations+="            proxy_set_header Host \$host;"$'\n'
-        network_api_locations+="        }"$'\n'
     done
 
     if [[ -z "${network_api_locations}" ]]; then
@@ -665,20 +685,20 @@ generate_nginx_conf() {
         rpc_server_block+="        # Docker embedded DNS (required for variable-based proxy_pass)"$'\n'
         rpc_server_block+="        resolver 127.0.0.11 valid=30s;"$'\n'
 
-        # Default RPC route: /v1/{key} → primary network's bitcoind
+        # Default RPC route: /v2/{key} → primary network's bitcoind
         local primary_net="${networks[0]}"
         get_chain_params "${primary_net}"
         local primary_rpc_port="${CHAIN_RPC_PORT}"
 
         rpc_server_block+=$'\n'
-        rpc_server_block+="$(_rpc_location_block "/v1/[^/]+" "bitcoind-${primary_net}" "${primary_rpc_port}")"
+        rpc_server_block+="$(_rpc_location_block "/v2/[^/]+" "bitcoind-${primary_net}" "${primary_rpc_port}")"
 
-        # Per-network explicit routes: /v1/{key}/{network}
+        # Per-network explicit routes: /v2/{key}/{network}
         local rpc_net
         for rpc_net in "${networks[@]}"; do
             get_chain_params "${rpc_net}"
             rpc_server_block+=$'\n\n'
-            rpc_server_block+="$(_rpc_location_block "/v1/[^/]+/${rpc_net}" "bitcoind-${rpc_net}" "${CHAIN_RPC_PORT}")"
+            rpc_server_block+="$(_rpc_location_block "/v2/[^/]+/${rpc_net}" "bitcoind-${rpc_net}" "${CHAIN_RPC_PORT}")"
         done
 
         rpc_server_block+=$'\n\n'
@@ -696,9 +716,9 @@ generate_nginx_conf() {
         rpc_server_block+="</style></head><body>"$'\n'
         rpc_server_block+="<h1>Bitcoin RPC Gateway</h1>"$'\n'
         rpc_server_block+="<p>This is a JSON-RPC endpoint. Send POST requests to:</p>"$'\n'
-        rpc_server_block+="<pre>POST /v1/{api-key}</pre>"$'\n'
+        rpc_server_block+="<pre>POST /v2/{api-key}</pre>"$'\n'
         rpc_server_block+="<p>Example:</p>"$'\n'
-        rpc_server_block+="<pre>curl -X POST https://host/v1/{api-key} \\"$'\n'
+        rpc_server_block+="<pre>curl -X POST https://host/v2/{api-key} \\"$'\n'
         rpc_server_block+="  -H \"Content-Type: application/json\" \\"$'\n'
         rpc_server_block+="  -d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"getblockchaininfo\",\"params\":[]}'</pre>"$'\n'
         rpc_server_block+="</body></html>"$'\n'
@@ -706,7 +726,7 @@ generate_nginx_conf() {
         rpc_server_block+="                else"$'\n'
         rpc_server_block+="                    ngx.header[\"Content-Type\"] = \"application/json\""$'\n'
         rpc_server_block+="                    ngx.status = 404"$'\n'
-        rpc_server_block+="                    ngx.say('{\"error\":\"Not found\",\"usage\":\"POST /v1/{api-key}\"}')"$'\n'
+        rpc_server_block+="                    ngx.say('{\"error\":\"Not found\",\"usage\":\"POST /v2/{api-key}\"}')"$'\n'
         rpc_server_block+="                end"$'\n'
         rpc_server_block+="            }"$'\n'
         rpc_server_block+="        }"$'\n'
@@ -925,7 +945,7 @@ generate_compose() {
         network_services+="      interval: 30s"$'\n'
         network_services+="      timeout: 10s"$'\n'
         network_services+="      retries: 5"$'\n'
-        network_services+="      start_period: 60s"$'\n'
+        network_services+="      start_period: 600s"$'\n'
         network_services+="    networks:"$'\n'
         network_services+="      - mempool_net"$'\n'
         network_services+="${security_block}"$'\n'
@@ -937,6 +957,14 @@ generate_compose() {
         local rpc_user rpc_pass
         rpc_user="$(get_config BITCOIN_RPC_USER)"
         rpc_pass="$(get_config BITCOIN_RPC_PASS)"
+
+        # Allow per-network data path override (e.g. ELECTRS_SIGNET_DATA_PATH=/RUST/electrs-signet)
+        local net_upper electrs_data_path
+        net_upper="$(echo "${net}" | tr '[:lower:]' '[:upper:]')"
+        electrs_data_path="$(get_config "ELECTRS_${net_upper}_DATA_PATH" "")"
+        if [[ -z "${electrs_data_path}" ]]; then
+            electrs_data_path="${storage_path}/${net}/electrs"
+        fi
 
         network_services+="  electrs-${net}:"$'\n'
         network_services+="    image: ${electrs_image}"$'\n'
@@ -952,14 +980,17 @@ generate_compose() {
         network_services+="      - /data"$'\n'
         network_services+="      - --cookie"$'\n'
         network_services+="      - ${rpc_user}:${rpc_pass}"$'\n'
+        network_services+="      - --http-addr"$'\n'
+        network_services+="      - 0.0.0.0:3003"$'\n'
         network_services+="      - --jsonrpc-import"$'\n'
         network_services+="    depends_on:"$'\n'
         network_services+="      bitcoind-${net}:"$'\n'
         network_services+="        condition: service_healthy"$'\n'
         network_services+="    volumes:"$'\n'
-        network_services+="      - ${storage_path}/${net}/electrs:/data/${electrs_network}"$'\n'
+        network_services+="      - ${electrs_data_path}:/data/${electrs_network}"$'\n'
         network_services+="    expose:"$'\n'
         network_services+="      - \"50001\""$'\n'
+        network_services+="      - \"3003\""$'\n'
         network_services+="    networks:"$'\n'
         network_services+="      - mempool_net"$'\n'
         network_services+="${security_block}"$'\n'

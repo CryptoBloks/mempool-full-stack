@@ -309,6 +309,12 @@ assert_file_contains "mempool-config.json: DATABASE = mempool" \
 assert_file_contains "mempool-config.json: USERNAME = testuser" \
     "${WORK_DIR}/config/mainnet/mempool-config.json" \
     '"USERNAME": "testuser"'
+assert_file_contains "mempool-config.json: BACKEND = esplora" \
+    "${WORK_DIR}/config/mainnet/mempool-config.json" \
+    '"BACKEND": "esplora"'
+assert_file_contains "mempool-config.json: ESPLORA REST_API_URL" \
+    "${WORK_DIR}/config/mainnet/mempool-config.json" \
+    '"REST_API_URL": "http://electrs-mainnet:3003"'
 
 echo ""
 echo "  --- docker-compose.yml checks ---"
@@ -348,6 +354,12 @@ assert_file_contains "docker-compose.yml: container_name: openresty" \
 assert_file_contains "docker-compose.yml: bitcoind healthcheck present" \
     "${WORK_DIR}/docker-compose.yml" \
     "bitcoin-cli.*getblockchaininfo"
+assert_file_contains "docker-compose.yml: electrs --http-addr flag" \
+    "${WORK_DIR}/docker-compose.yml" \
+    -- "--http-addr"
+assert_file_contains "docker-compose.yml: electrs exposes port 3003" \
+    "${WORK_DIR}/docker-compose.yml" \
+    '"3003"'
 
 # C6 BUG CHECK: The healthcheck for bitcoind should include -datadir=/data/.bitcoin
 # so bitcoin-cli can find the cookie/config. Currently this is missing.
@@ -362,12 +374,21 @@ echo "  --- nginx.conf checks ---"
 assert_file_contains "nginx.conf: upstream mempool-api-mainnet" \
     "${WORK_DIR}/config/openresty/nginx.conf" \
     "upstream mempool-api-mainnet"
-assert_file_contains "nginx.conf: proxy_pass to mempool-api-mainnet" \
+assert_file_not_contains "nginx.conf: no electrs upstream (backend handles internally)" \
+    "${WORK_DIR}/config/openresty/nginx.conf" \
+    "upstream electrs-mainnet"
+assert_file_contains "nginx.conf: all API routes to backend" \
     "${WORK_DIR}/config/openresty/nginx.conf" \
     "proxy_pass http://mempool-api-mainnet"
+assert_file_contains "nginx.conf: /api/v1 location" \
+    "${WORK_DIR}/config/openresty/nginx.conf" \
+    "location /api/v1"
+assert_file_contains "nginx.conf: /api/ shorthand location" \
+    "${WORK_DIR}/config/openresty/nginx.conf" \
+    "location /api/"
 assert_file_not_contains "nginx.conf: no RPC location when RPC disabled" \
     "${WORK_DIR}/config/openresty/nginx.conf" \
-    "location ~ \^/v1/"
+    "location ~ \^/v2/"
 assert_file_contains "nginx.conf: server_name _" \
     "${WORK_DIR}/config/openresty/nginx.conf" \
     "server_name _"
@@ -556,9 +577,9 @@ assert_file_contains "jsonrpc-access.lua: whitelisted_methods table" \
 echo ""
 echo "  --- nginx.conf RPC checks ---"
 
-assert_file_contains "nginx.conf: RPC location block /v1/" \
+assert_file_contains "nginx.conf: RPC location block /v2/" \
     "${WORK_DIR}/config/openresty/nginx.conf" \
-    "/v1/"
+    "/v2/"
 
 echo ""
 echo "  --- bitcoin.conf RPC gateway checks (mainnet) ---"

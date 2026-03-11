@@ -199,7 +199,7 @@ Go to **Zero Trust** → **Networks** → **Tunnels**. Your tunnel should show a
 curl -I https://mempool.yourdomain.com
 
 # RPC endpoint (if configured)
-curl -X POST https://rpc.yourdomain.com/v1/YOUR_API_KEY \
+curl -X POST https://rpc.yourdomain.com/v2/YOUR_API_KEY \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"getblockchaininfo","params":[]}'
 ```
