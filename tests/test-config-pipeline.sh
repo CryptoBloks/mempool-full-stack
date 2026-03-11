@@ -374,12 +374,15 @@ echo "  --- nginx.conf checks ---"
 assert_file_contains "nginx.conf: upstream mempool-api-mainnet" \
     "${WORK_DIR}/config/openresty/nginx.conf" \
     "upstream mempool-api-mainnet"
-assert_file_not_contains "nginx.conf: no electrs upstream (backend handles internally)" \
+assert_file_contains "nginx.conf: electrs upstream for esplora routes" \
     "${WORK_DIR}/config/openresty/nginx.conf" \
     "upstream electrs-mainnet"
-assert_file_contains "nginx.conf: all API routes to backend" \
+assert_file_contains "nginx.conf: /api/v1 routes to backend" \
     "${WORK_DIR}/config/openresty/nginx.conf" \
     "proxy_pass http://mempool-api-mainnet"
+assert_file_contains "nginx.conf: /api/ routes to electrs" \
+    "${WORK_DIR}/config/openresty/nginx.conf" \
+    "proxy_pass http://electrs-mainnet"
 assert_file_contains "nginx.conf: /api/v1 location" \
     "${WORK_DIR}/config/openresty/nginx.conf" \
     "location /api/v1"
