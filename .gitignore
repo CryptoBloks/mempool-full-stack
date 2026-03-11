@@ -35,7 +35,6 @@ config/openresty/
 config/cloudflared/
 config/mariadb/init/
 config/mariadb/my.cnf
-config/branding/customize.js
 config/ufw-rules.sh
 
 # Legacy V1 config directories (replaced by per-network generated configs)

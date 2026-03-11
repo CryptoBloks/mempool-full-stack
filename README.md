@@ -34,7 +34,7 @@ cd mempool.space-full-stack-docker
 docker compose up -d
 ```
 
-The wizard walks through 13 configuration sections: network selection, Bitcoin source, versions, storage, bind IP, Bitcoin Core options, RPC endpoint, ports, SSL/TLS, Cloudflare Tunnel, firewall, branding, and credentials. It generates `node.conf` and then calls `generate-config.sh` to produce all service configuration files.
+The wizard walks through 11 configuration sections: network selection, versions, storage, Bitcoin Core options, RPC endpoint, ports, SSL/TLS, Cloudflare Tunnel, firewall, and credentials. It generates `node.conf` and then calls `generate-config.sh` to produce all service configuration files.
 
 ### Non-Interactive Setup
 
@@ -191,35 +191,6 @@ The generated `config/ufw-rules.sh` includes:
 - Tunnel-aware logic (web/RPC ports skipped when Cloudflare Tunnel is enabled)
 - Bitcoin P2P ports always open (8333/38333/18333)
 - SSH always allowed
-
-## Branding
-
-Customize the mempool frontend with your organization's name and logo.
-
-### Via Wizard
-
-The wizard (section 12/13) prompts for branding. Set `BRANDING_NAME` and `BRANDING_TITLE` in `node.conf`, then place your logo at `config/branding/logo.png`.
-
-### Manual Setup
-
-1. Add to `node.conf`:
-   ```
-   BRANDING_NAME=YourCompany
-   BRANDING_TITLE=YourCompany Bitcoin Explorer
-   ```
-
-2. Place your logo (512x512 PNG recommended) at:
-   ```
-   config/branding/logo.png
-   ```
-
-3. Regenerate and restart:
-   ```bash
-   ./scripts/setup/generate-config.sh
-   docker compose up -d mempool-web
-   ```
-
-The generator creates `config/branding/customize.js` which is mounted into the frontend container, overriding the default mempool.space branding with your logo and title.
 
 ## Backup & Restore
 
