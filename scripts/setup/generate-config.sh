@@ -992,6 +992,8 @@ generate_compose() {
         network_services+="      - ${rpc_user}:${rpc_pass}"$'\n'
         network_services+="      - --http-addr"$'\n'
         network_services+="      - 0.0.0.0:3003"$'\n'
+        network_services+="      - --rest-default-chain-txs-per-page"$'\n'
+        network_services+="      - \"10\""$'\n'
         network_services+="      - --jsonrpc-import"$'\n'
         network_services+="    depends_on:"$'\n'
         network_services+="      bitcoind-${net}:"$'\n'
