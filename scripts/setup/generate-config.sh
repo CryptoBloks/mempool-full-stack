@@ -547,6 +547,9 @@ generate_nginx_conf() {
         upstream_blocks+="    upstream mempool-api-${net} {"$'\n'
         upstream_blocks+="        server mempool-api-${net}:8999;"$'\n'
         upstream_blocks+="    }"$'\n'
+        upstream_blocks+="    upstream electrs-${net} {"$'\n'
+        upstream_blocks+="        server electrs-${net}:3003;"$'\n'
+        upstream_blocks+="    }"$'\n'
     done
     upstream_blocks+="    upstream mempool-web {"$'\n'
     upstream_blocks+="        server mempool-web:8080;"$'\n'
@@ -554,17 +557,22 @@ generate_nginx_conf() {
 
     # --- Helper: generate API location blocks for a network ---
     #
-    # All API requests are routed to the mempool backend, matching the
-    # official mempool.space production nginx config. The backend handles
-    # the esplora/electrs split internally — when BACKEND=esplora, it
-    # proxies to electrs HTTP API via ESPLORA.REST_API_URL for routes
-    # it doesn't handle itself.
+    # Matches the official mempool.space production nginx routing:
+    #   /api/v1/*  → mempool backend (port 8999)
+    #   /api/*     → electrs HTTP API (port 3003) directly
+    #
+    # The frontend uses /api/v1/ for mempool-specific endpoints (fees,
+    # mining, statistics, websockets) and /api/ (no v1) for esplora/
+    # electrs endpoints (block txs, address txs, tx details, etc.).
     _api_locations() {
         local net="$1"        # e.g. "mainnet" or "signet"
         local prefix="$2"     # URL prefix: "" for mainnet, "/${net}" for others
         local out=""
 
         local backend="mempool-api-${net}"
+        local electrs="electrs-${net}"
+
+        # --- mempool backend routes (/api/v1/*) ---
 
         # Websocket
         out+="        location ${prefix}/api/v1/ws {"$'\n'
@@ -577,7 +585,7 @@ generate_nginx_conf() {
         out+="        }"$'\n'
         out+=$'\n'
 
-        # /api/v1/ → backend
+        # /api/v1/ → mempool backend
         out+="        location ${prefix}/api/v1 {"$'\n'
         out+="            rewrite ^${prefix}/api/v1(.*) /api/v1\$1 break;"$'\n'
         out+="            proxy_pass http://${backend};"$'\n'
@@ -588,10 +596,12 @@ generate_nginx_conf() {
         out+="        }"$'\n'
         out+=$'\n'
 
-        # /api/ shorthand → backend (maps to /api/v1/)
+        # --- electrs/esplora routes (/api/* without v1) ---
+
+        # /api/ → electrs HTTP API directly (strips prefix, no v1 rewrite)
         out+="        location ${prefix}/api/ {"$'\n'
-        out+="            rewrite ^${prefix}/api/(.*) /api/v1/\$1 break;"$'\n'
-        out+="            proxy_pass http://${backend};"$'\n'
+        out+="            rewrite ^${prefix}/api/(.*) /\$1 break;"$'\n'
+        out+="            proxy_pass http://${electrs};"$'\n'
         out+="            proxy_set_header Host \$host;"$'\n'
         out+="            proxy_set_header X-Real-IP \$remote_addr;"$'\n'
         out+="            proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;"$'\n'
