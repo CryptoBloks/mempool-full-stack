@@ -877,6 +877,26 @@ generate_cloudflared() {
 }
 
 # ==============================================================================
+# Branding / customize.js generator
+# ==============================================================================
+generate_branding() {
+    local branding_name
+    branding_name="$(get_config BRANDING_NAME "")"
+    local branding_title
+    branding_title="$(get_config BRANDING_TITLE "${branding_name}")"
+
+    declare -A brand_vars=(
+        [BRANDING_NAME]="${branding_name}"
+        [BRANDING_TITLE]="${branding_title}"
+    )
+
+    local output
+    output="$(render_template "${TEMPLATE_DIR}/customize.js.tmpl" brand_vars)"
+
+    write_file "${CONFIG_DIR}/branding/customize.js" "${output}"
+}
+
+# ==============================================================================
 # Docker Compose generator
 # ==============================================================================
 
@@ -1094,6 +1114,14 @@ generate_compose() {
         shared_services+="      mempool-api-${net}:"$'\n'
         shared_services+="        condition: service_started"$'\n'
     done
+    # Branding volume mounts (when configured)
+    local web_branding_name
+    web_branding_name="$(get_config BRANDING_NAME "")"
+    if [[ -n "${web_branding_name}" ]]; then
+        shared_services+="    volumes:"$'\n'
+        shared_services+="      - ./config/branding/customize.js:/var/www/mempool/browser/resources/customize.js:ro"$'\n'
+        shared_services+="      - ./config/branding/logo.png:/var/www/mempool/browser/resources/branding/logo.png:ro"$'\n'
+    fi
     shared_services+="    expose:"$'\n'
     shared_services+="      - \"8080\""$'\n'
     shared_services+="    networks:"$'\n'
@@ -1396,6 +1424,13 @@ main() {
     if [[ "${tunnel_enabled}" == "true" ]]; then
         log_info "Cloudflare Tunnel enabled — generating tunnel config..."
         generate_cloudflared
+    fi
+
+    local branding_name
+    branding_name="$(get_config BRANDING_NAME "")"
+    if [[ -n "${branding_name}" ]]; then
+        log_info "Branding enabled — generating customize.js..."
+        generate_branding
     fi
 
     # ---- Generate firewall rules ----
