@@ -400,6 +400,8 @@ generate_bitcoin_conf() {
     dbcache="$(get_config DBCACHE 2048)"
     maxmempool="$(get_config MAXMEMPOOL 300)"
     maxconnections="$(get_config MAXCONNECTIONS 40)"
+    rpcworkqueue="$(get_config RPCWORKQUEUE 128)"
+    rpcthreads="$(get_config RPCTHREADS 8)"
 
     # Map boolean-style txindex to 0/1
     case "${txindex}" in
@@ -423,6 +425,8 @@ generate_bitcoin_conf() {
         [DBCACHE]="${dbcache}"
         [MAXMEMPOOL]="${maxmempool}"
         [MAXCONNECTIONS]="${maxconnections}"
+        [RPCWORKQUEUE]="${rpcworkqueue}"
+        [RPCTHREADS]="${rpcthreads}"
     )
 
     local output
