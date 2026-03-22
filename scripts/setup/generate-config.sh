@@ -330,7 +330,7 @@ get_network_section() {
 get_mempool_network() {
     local network="$1"
     case "${network}" in
-        mainnet)  printf '' ;;
+        mainnet)  printf 'mainnet' ;;
         signet)   printf 'signet' ;;
         testnet)  printf 'testnet' ;;
         *)        log_error "Unknown network: ${network}"; return 1 ;;
@@ -545,19 +545,12 @@ generate_nginx_conf() {
     server_name="$(get_config DOMAIN_WEB _)"
 
     # --- Build upstream blocks ---
+    # Use Docker embedded DNS with variable-based proxy_pass for dynamic
+    # resolution. Static upstream blocks resolve at startup only, which
+    # causes routing failures if containers restart and get new IPs.
     local upstream_blocks=""
-    local net
-    for net in "${networks[@]}"; do
-        upstream_blocks+="    upstream mempool-api-${net} {"$'\n'
-        upstream_blocks+="        server mempool-api-${net}:8999;"$'\n'
-        upstream_blocks+="    }"$'\n'
-        upstream_blocks+="    upstream electrs-${net} {"$'\n'
-        upstream_blocks+="        server electrs-${net}:3003;"$'\n'
-        upstream_blocks+="    }"$'\n'
-    done
-    upstream_blocks+="    upstream mempool-web {"$'\n'
-    upstream_blocks+="        server mempool-web:8080;"$'\n'
-    upstream_blocks+="    }"
+    upstream_blocks+="    # Docker embedded DNS (required for variable-based proxy_pass)"$'\n'
+    upstream_blocks+="    resolver 127.0.0.11 valid=30s;"
 
     # --- Helper: generate API location blocks for a network ---
     #
@@ -581,7 +574,8 @@ generate_nginx_conf() {
         # Websocket
         out+="        location ${prefix}/api/v1/ws {"$'\n'
         out+="            rewrite ^${prefix}/api/v1/ws(.*) /api/v1/ws\$1 break;"$'\n'
-        out+="            proxy_pass http://${backend};"$'\n'
+        out+="            set \$backend_api http://${backend}:8999;"$'\n'
+        out+="            proxy_pass \$backend_api;"$'\n'
         out+="            proxy_http_version 1.1;"$'\n'
         out+="            proxy_set_header Upgrade \$http_upgrade;"$'\n'
         out+="            proxy_set_header Connection \"upgrade\";"$'\n'
@@ -592,7 +586,8 @@ generate_nginx_conf() {
         # /api/v1/ → mempool backend
         out+="        location ${prefix}/api/v1 {"$'\n'
         out+="            rewrite ^${prefix}/api/v1(.*) /api/v1\$1 break;"$'\n'
-        out+="            proxy_pass http://${backend};"$'\n'
+        out+="            set \$backend_api http://${backend}:8999;"$'\n'
+        out+="            proxy_pass \$backend_api;"$'\n'
         out+="            proxy_set_header Host \$host;"$'\n'
         out+="            proxy_set_header X-Real-IP \$remote_addr;"$'\n'
         out+="            proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;"$'\n'
@@ -605,7 +600,8 @@ generate_nginx_conf() {
         # /api/ → electrs HTTP API directly (strips prefix, no v1 rewrite)
         out+="        location ${prefix}/api/ {"$'\n'
         out+="            rewrite ^${prefix}/api/(.*) /\$1 break;"$'\n'
-        out+="            proxy_pass http://${electrs};"$'\n'
+        out+="            set \$backend_electrs http://${electrs}:3003;"$'\n'
+        out+="            proxy_pass \$backend_electrs;"$'\n'
         out+="            proxy_set_header Host \$host;"$'\n'
         out+="            proxy_set_header X-Real-IP \$remote_addr;"$'\n'
         out+="            proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;"$'\n'
@@ -999,6 +995,7 @@ generate_compose() {
         network_services+="      - --rest-default-chain-txs-per-page"$'\n'
         network_services+="      - \"10\""$'\n'
         network_services+="      - --jsonrpc-import"$'\n'
+        network_services+="      - -vvv"$'\n'
         network_services+="    depends_on:"$'\n'
         network_services+="      bitcoind-${net}:"$'\n'
         network_services+="        condition: service_healthy"$'\n'
@@ -1009,6 +1006,10 @@ generate_compose() {
         network_services+="      - \"3003\""$'\n'
         network_services+="    networks:"$'\n'
         network_services+="      - mempool_net"$'\n'
+        network_services+="    ulimits:"$'\n'
+        network_services+="      nofile:"$'\n'
+        network_services+="        soft: 65536"$'\n'
+        network_services+="        hard: 65536"$'\n'
         network_services+="${security_block}"$'\n'
         network_services+=$'\n'
 

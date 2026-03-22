@@ -19,7 +19,7 @@ http {
     # Shared memory zone for RPC rate limiting (10MB)
     lua_shared_dict rpc_limit 10m;
 
-    # Upstream definitions (per-network)
+    # Dynamic DNS resolution (resolves hostnames at request time, not startup)
 {{UPSTREAM_BLOCKS}}
 
     server {
@@ -35,7 +35,8 @@ http {
 
         # Frontend
         location / {
-            proxy_pass http://mempool-web;
+            set $frontend http://mempool-web:8080;
+            proxy_pass $frontend;
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
