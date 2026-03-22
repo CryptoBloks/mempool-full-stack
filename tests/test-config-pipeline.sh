@@ -360,6 +360,9 @@ assert_file_contains "docker-compose.yml: electrs --http-addr flag" \
 assert_file_contains "docker-compose.yml: electrs exposes port 3003" \
     "${WORK_DIR}/docker-compose.yml" \
     '"3003"'
+assert_file_contains "docker-compose.yml: electrs ulimits nofile" \
+    "${WORK_DIR}/docker-compose.yml" \
+    "nofile:"
 
 # C6 BUG CHECK: The healthcheck for bitcoind should include -datadir=/data/.bitcoin
 # so bitcoin-cli can find the cookie/config. Currently this is missing.
@@ -371,18 +374,15 @@ assert_file_contains "docker-compose.yml: C6 BUG — healthcheck should have -da
 echo ""
 echo "  --- nginx.conf checks ---"
 
-assert_file_contains "nginx.conf: upstream mempool-api-mainnet" \
+assert_file_contains "nginx.conf: Docker DNS resolver for dynamic resolution" \
     "${WORK_DIR}/config/openresty/nginx.conf" \
-    "upstream mempool-api-mainnet"
-assert_file_contains "nginx.conf: electrs upstream for esplora routes" \
+    "resolver 127.0.0.11 valid=30s"
+assert_file_contains "nginx.conf: /api/v1 uses variable-based proxy_pass for backend" \
     "${WORK_DIR}/config/openresty/nginx.conf" \
-    "upstream electrs-mainnet"
-assert_file_contains "nginx.conf: /api/v1 routes to backend" \
+    'set $backend_api http://mempool-api-mainnet:8999'
+assert_file_contains "nginx.conf: /api/ uses variable-based proxy_pass for electrs" \
     "${WORK_DIR}/config/openresty/nginx.conf" \
-    "proxy_pass http://mempool-api-mainnet"
-assert_file_contains "nginx.conf: /api/ routes to electrs" \
-    "${WORK_DIR}/config/openresty/nginx.conf" \
-    "proxy_pass http://electrs-mainnet"
+    'set $backend_electrs http://electrs-mainnet:3003'
 assert_file_contains "nginx.conf: /api/v1 location" \
     "${WORK_DIR}/config/openresty/nginx.conf" \
     "location /api/v1"
